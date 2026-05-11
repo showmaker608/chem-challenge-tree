@@ -9,6 +9,7 @@ export interface KnowledgePoint {
   id: string;
   topic: string;
   difficulty: number; // 1-3
+  prerequisites?: string[];
   challenges: Challenge[];
 }
 
@@ -47,8 +48,23 @@ export interface PlayerState {
   streak: number;
   maxStreak: number;
   completedNodes: string[];
+  unlockedNodes: string[];
   nodeStates: Record<string, NodeState>;
   achievements: string[];
+}
+
+export interface StudentProfile {
+  profileId: string;
+  classCode: string;
+  className: string;
+  studentName: string;
+  pin: string;
+  createdAt: string;
+}
+
+export interface ClassAccess {
+  classCode: string;
+  className: string;
 }
 
 // 等级定义

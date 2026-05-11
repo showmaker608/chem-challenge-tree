@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Chapter } from '../types';
 import { TreeNode } from './TreeNode';
 import { ChapterHeader } from './ChapterHeader';
@@ -11,17 +11,13 @@ interface SkillTreeProps {
 }
 
 export function SkillTree({ chapters, completedNodes, availableNodes, onNodeClick }: SkillTreeProps) {
-  const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
+  const [expandedChapters, setExpandedChapters] = useState<Set<string>>(
+    () => new Set(chapters[0] ? [chapters[0].id] : []),
+  );
 
   const completed = completedNodes.length;
   const total = chapters.reduce(
     (a, c) => a + c.sections.reduce((s, sec) => s + sec.nodes.length, 0), 0);
-
-  useEffect(() => {
-    if (expandedChapters.size === 0 && chapters[0]) {
-      setExpandedChapters(new Set([chapters[0].id]));
-    }
-  }, []);
 
   const toggleChapter = (chapterId: string) => {
     setExpandedChapters(prev => {
@@ -84,6 +80,7 @@ export function SkillTree({ chapters, completedNodes, availableNodes, onNodeClic
                             topic={node.topic}
                             difficulty={node.difficulty}
                             status={isCompleted ? 'completed' : isAvailable ? 'available' : 'locked'}
+                            lockedReason={isAvailable ? undefined : '完成前置挑战可跳关'}
                             onClick={() => onNodeClick(node.id)}
                           />
                         );

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { PlayerState, NodeState } from '../types';
+import type { ClassAccess, PlayerState, NodeState, StudentProfile } from '../types';
 import { XP_PER_NODE, XP_BONUS_STREAK, getLevel } from '../types';
 
-const STORAGE_KEY = 'chem-tree-progress';
+const ACTIVE_PROFILE_KEY = 'chem-tree-active-profile';
+const PROGRESS_KEY_PREFIX = 'chem-tree-progress';
 
 const defaultState: PlayerState = {
   xp: 0,
@@ -10,33 +11,77 @@ const defaultState: PlayerState = {
   streak: 0,
   maxStreak: 0,
   completedNodes: [],
+  unlockedNodes: [],
   nodeStates: {},
   achievements: [],
 };
 
-function loadState(): PlayerState {
+function makeProfileId(classCode: string, studentName: string, pin: string) {
+  const cleanClass = classCode.trim().toUpperCase();
+  const cleanName = studentName.trim();
+  return `${cleanClass}:${cleanName}:${pin.trim()}`;
+}
+
+function getProgressKey(profileId: string) {
+  return `${PROGRESS_KEY_PREFIX}:${profileId}`;
+}
+
+function loadProfile(): StudentProfile | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(ACTIVE_PROFILE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as StudentProfile;
+    return {
+      ...parsed,
+      className: parsed.className ?? parsed.classCode,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveProfile(profile: StudentProfile | null) {
+  try {
+    if (profile) localStorage.setItem(ACTIVE_PROFILE_KEY, JSON.stringify(profile));
+    else localStorage.removeItem(ACTIVE_PROFILE_KEY);
+  } catch {
+    // Student identity persistence is best-effort until cloud sync is connected.
+  }
+}
+
+function loadState(profileId: string | null): PlayerState {
+  if (!profileId) return { ...defaultState };
+
+  try {
+    const raw = localStorage.getItem(getProgressKey(profileId));
     if (raw) {
       const parsed = JSON.parse(raw) as PlayerState;
       return { ...defaultState, ...parsed };
     }
-  } catch {}
+  } catch {
+    return { ...defaultState };
+  }
   return { ...defaultState };
 }
 
-function saveState(state: PlayerState) {
+function saveState(profileId: string | null, state: PlayerState) {
+  if (!profileId) return;
+
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
+    localStorage.setItem(getProgressKey(profileId), JSON.stringify(state));
+  } catch {
+    // Progress persistence is best-effort; private browsing can disable storage.
+  }
 }
 
 export function useGameState() {
-  const [state, setState] = useState<PlayerState>(loadState);
+  const [profile, setProfile] = useState<StudentProfile | null>(loadProfile);
+  const [state, setState] = useState<PlayerState>(() => loadState(profile?.profileId ?? null));
 
   useEffect(() => {
-    saveState(state);
-  }, [state]);
+    saveState(profile?.profileId ?? null, state);
+  }, [profile?.profileId, state]);
 
   const getNodeState = useCallback(
     (nodeId: string): NodeState => {
@@ -53,12 +98,13 @@ export function useGameState() {
 
   const isNodeAvailable = useCallback(
     (nodeId: string, allNodeIds: string[]): boolean => {
+      if (state.unlockedNodes.includes(nodeId)) return true;
       const idx = allNodeIds.indexOf(nodeId);
       if (idx === 0) return true;
       const prevId = allNodeIds[idx - 1];
       return state.completedNodes.includes(prevId);
     },
-    [state.completedNodes],
+    [state.completedNodes, state.unlockedNodes],
   );
 
   const completeNode = useCallback(
@@ -66,7 +112,9 @@ export function useGameState() {
       setState((prev) => {
         const wasCompleted = prev.completedNodes.includes(nodeId);
         const newStreak = wasCompleted ? prev.streak : prev.streak + 1;
-        const xpGain = XP_PER_NODE + (newStreak > 1 ? XP_BONUS_STREAK : 0);
+        const xpGain = wasCompleted
+          ? 0
+          : XP_PER_NODE + (newStreak > 1 ? XP_BONUS_STREAK : 0);
 
         const newXp = prev.xp + xpGain;
         const newLevel = getLevel(newXp).level;
@@ -97,6 +145,27 @@ export function useGameState() {
     [],
   );
 
+  const unlockNode = useCallback((nodeId: string) => {
+    setState((prev) => {
+      if (prev.unlockedNodes.includes(nodeId) || prev.completedNodes.includes(nodeId)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        unlockedNodes: [...prev.unlockedNodes, nodeId],
+        nodeStates: {
+          ...prev.nodeStates,
+          [nodeId]: {
+            status: 'available',
+            bestScore: prev.nodeStates[nodeId]?.bestScore ?? 0,
+            attempts: prev.nodeStates[nodeId]?.attempts ?? 0,
+          },
+        },
+      };
+    });
+  }, []);
+
   const recordAttempt = useCallback((nodeId: string) => {
     setState((prev) => ({
       ...prev,
@@ -117,15 +186,42 @@ export function useGameState() {
 
   const resetProgress = useCallback(() => {
     setState({ ...defaultState });
-    localStorage.removeItem(STORAGE_KEY);
+    if (profile?.profileId) {
+      localStorage.removeItem(getProgressKey(profile.profileId));
+    }
+  }, [profile]);
+
+  const signInProfile = useCallback((classAccess: ClassAccess, studentName: string, pin: string) => {
+    const nextProfile: StudentProfile = {
+      profileId: makeProfileId(classAccess.classCode, studentName, pin),
+      classCode: classAccess.classCode.trim().toUpperCase(),
+      className: classAccess.className,
+      studentName: studentName.trim(),
+      pin: pin.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    saveProfile(nextProfile);
+    setProfile(nextProfile);
+    setState(loadState(nextProfile.profileId));
+  }, []);
+
+  const signOutProfile = useCallback(() => {
+    saveProfile(null);
+    setProfile(null);
+    setState({ ...defaultState });
   }, []);
 
   return {
+    profile,
     state,
     getNodeState,
     isNodeAvailable,
     completeNode,
+    unlockNode,
     recordAttempt,
     resetProgress,
+    signInProfile,
+    signOutProfile,
   };
 }

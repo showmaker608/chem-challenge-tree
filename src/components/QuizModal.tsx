@@ -1,15 +1,41 @@
 import { useState } from 'react';
-import type { KnowledgePoint } from '../types';
+import type { KnowledgePoint, StudentProfile } from '../types';
 import { XP_PER_NODE, XP_BONUS_STREAK } from '../types';
+import { saveQuestionFeedback } from '../services/questionFeedback';
+/** 将 [条件]= 渲染为条件在等号上方的 React 元素 */
+function renderEq(text: string): React.ReactNode {
+  const parts = text.split(/(\[[^\]]+\](?:=|→))/g);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) => {
+    const m = part.match(/^\[([^\]]+)\](=|→)$/);
+    if (m) {
+      return (
+        <span key={i} style={{ display: 'inline-grid', gridTemplateRows: 'auto auto', justifyItems: 'center', verticalAlign: 'middle', lineHeight: 1, margin: '0 0.125em' }}>
+          <span style={{ fontSize: '0.55em', color: '#fbbf24', fontWeight: 600, lineHeight: 1 }}>
+            {m[1]}
+          </span>
+          <span style={{ fontFamily: 'monospace', color: '#67e8f9', fontSize: '1.3em', fontWeight: 900, letterSpacing: '0.08em', lineHeight: 1 }}>
+            {m[2]}
+          </span>
+        </span>
+      );
+    }
+    // 普通化学式等宽
+    return part.split(/([A-Z][a-z]?[₀₁₂₃₄₅₆₇₈₉⁺²⁻³↑↓]+)/g).map((sp, j) =>
+      /[A-Z]/.test(sp) ? <code key={j} className="font-mono text-[0.9em] not-italic text-slate-200">{sp}</code> : sp
+    );
+  });
+}
 
 interface QuizModalProps {
   node: KnowledgePoint;
   onClose: () => void;
   onComplete: (nodeId: string, score: number) => void;
   currentStreak: number;
+  profile: StudentProfile;
 }
 
-export function QuizModal({ node, onClose, onComplete, currentStreak }: QuizModalProps) {
+export function QuizModal({ node, onClose, onComplete, currentStreak, profile }: QuizModalProps) {
   const [challengeIdx, setChallengeIdx] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
@@ -18,6 +44,9 @@ export function QuizModal({ node, onClose, onComplete, currentStreak }: QuizModa
   const [xpGained, setXpGained] = useState(0);
   const [showXpFloat, setShowXpFloat] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSaved, setFeedbackSaved] = useState(false);
 
   const challenge = node.challenges[challengeIdx];
 
@@ -40,6 +69,9 @@ export function QuizModal({ node, onClose, onComplete, currentStreak }: QuizModa
       setChallengeIdx(i => i + 1);
       setSelected(null);
       setShowResult(false);
+      setShowFeedback(false);
+      setFeedbackText('');
+      setFeedbackSaved(false);
     } else {
       // 全部答完
       const score = Math.round((correct + (selected === challenge.answer ? 1 : 0)) / total * 100);
@@ -49,6 +81,23 @@ export function QuizModal({ node, onClose, onComplete, currentStreak }: QuizModa
   };
 
   const finalScore = isComplete ? Math.round(((correct) / total) * 100) : 0;
+
+  const handleFeedbackSubmit = () => {
+    if (!feedbackText.trim()) return;
+
+    saveQuestionFeedback({
+      profile,
+      nodeId: node.id,
+      nodeTopic: node.topic,
+      challenge,
+      challengeIndex: challengeIdx,
+      selectedAnswer: selected,
+      comment: feedbackText,
+    });
+    setFeedbackSaved(true);
+    setShowFeedback(false);
+    setFeedbackText('');
+  };
 
   if (isComplete) {
     return (
@@ -108,7 +157,7 @@ export function QuizModal({ node, onClose, onComplete, currentStreak }: QuizModa
         {/* 题目 */}
         <div className="mb-6">
           <div className="text-xs text-cyan-400 mb-1">💡 {node.topic}</div>
-          <h3 className="text-base text-white leading-relaxed">{challenge.stem}</h3>
+          <h3 className="text-base text-white leading-relaxed">{renderEq(challenge.stem)}</h3>
         </div>
 
         {/* 选项 */}
@@ -130,7 +179,7 @@ export function QuizModal({ node, onClose, onComplete, currentStreak }: QuizModa
             return (
               <button key={i} onClick={() => handleSelect(i)} className={btnClass} disabled={showResult}>
                 <span className="text-slate-500 mr-2">{String.fromCharCode(65 + i)}.</span>
-                {opt}
+                {renderEq(opt)}
               </button>
             );
           })}
@@ -140,9 +189,55 @@ export function QuizModal({ node, onClose, onComplete, currentStreak }: QuizModa
         {showResult && (
           <div className="mb-4 bg-slate-900/50 rounded-xl p-4 border border-slate-700/50">
             <div className="text-xs text-amber-400 mb-1">📖 解析</div>
-            <p className="text-sm text-slate-300 leading-relaxed">{challenge.explanation}</p>
+            <div className="text-sm text-slate-300 leading-relaxed">{renderEq(challenge.explanation)}</div>
           </div>
         )}
+
+        <div className="mb-4">
+          {!showFeedback ? (
+            <button
+              onClick={() => setShowFeedback(true)}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-400/60 text-amber-300/80 hover:text-amber-200 text-sm font-medium transition-all"
+            >
+              <span className="text-base">💬</span> 这题有问题？点此反馈
+            </button>
+          ) : (
+            <div className="bg-slate-900/50 rounded-xl p-3 border border-amber-500/30 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs text-amber-400/80 mb-1">
+                <span>💬</span> 反馈错题
+              </div>
+              <textarea
+                value={feedbackText}
+                onChange={(event) => setFeedbackText(event.target.value)}
+                className="w-full min-h-20 rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-400"
+                placeholder="例如：题干不清楚、答案可能有误、解析看不懂..."
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowFeedback(false);
+                    setFeedbackText('');
+                  }}
+                  className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleFeedbackSubmit}
+                  disabled={!feedbackText.trim()}
+                  className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  提交反馈
+                </button>
+              </div>
+            </div>
+          )}
+          {feedbackSaved && (
+            <div className="mt-2 flex items-center gap-1 text-sm text-emerald-400">
+              <span>✅</span> 反馈已提交，老师会统一查看
+            </div>
+          )}
+        </div>
 
         {/* 下一题按钮 */}
         {showResult && (

@@ -5,16 +5,31 @@ import { useGameState } from './hooks/useGameState';
 import { SkillTree } from './components/SkillTree';
 import { QuizModal } from './components/QuizModal';
 import { StatusBar } from './components/StatusBar';
+import { StudentGate } from './components/StudentGate';
+import { UnlockChallengeModal } from './components/UnlockChallengeModal';
 
 function App() {
-  const { state, isNodeAvailable, completeNode, recordAttempt, resetProgress } = useGameState();
+  const {
+    profile,
+    state,
+    isNodeAvailable,
+    completeNode,
+    unlockNode,
+    recordAttempt,
+    resetProgress,
+    signInProfile,
+    signOutProfile,
+  } = useGameState();
   const [activeNode, setActiveNode] = useState<KnowledgePoint | null>(null);
+  const [unlockTarget, setUnlockTarget] = useState<KnowledgePoint | null>(null);
   const [showReset, setShowReset] = useState(false);
 
-  const allNodeIds = useMemo(
-    () => chapters.flatMap(ch => ch.sections.flatMap(sec => sec.nodes.map(n => n.id))),
+  const allNodes = useMemo(
+    () => chapters.flatMap(ch => ch.sections.flatMap(sec => sec.nodes)),
     [],
   );
+
+  const allNodeIds = useMemo(() => allNodes.map(node => node.id), [allNodes]);
 
   const totalNodes = allNodeIds.length;
 
@@ -28,13 +43,24 @@ function App() {
     return set;
   }, [allNodeIds, isNodeAvailable, state.completedNodes]);
 
+  const getPrerequisiteIds = useCallback((node: KnowledgePoint) => {
+    if (node.prerequisites?.length) return node.prerequisites;
+
+    const idx = allNodeIds.indexOf(node.id);
+    return idx > 0 ? [allNodeIds[idx - 1]] : [];
+  }, [allNodeIds]);
+
   const handleNodeClick = useCallback((nodeId: string) => {
-    if (!availableNodes.has(nodeId)) return;
-    const node = chapters
-      .flatMap(ch => ch.sections.flatMap(sec => sec.nodes))
-      .find(n => n.id === nodeId);
-    if (node) setActiveNode(node);
-  }, [availableNodes]);
+    const node = allNodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    if (availableNodes.has(nodeId)) {
+      setActiveNode(node);
+      return;
+    }
+
+    setUnlockTarget(node);
+  }, [allNodes, availableNodes]);
 
   const handleComplete = useCallback((nodeId: string, score: number) => {
     completeNode(nodeId, score);
@@ -55,6 +81,25 @@ function App() {
     setShowReset(false);
   }, [resetProgress]);
 
+  const handleUnlockPass = useCallback(() => {
+    if (!unlockTarget) return;
+    unlockNode(unlockTarget.id);
+    setActiveNode(unlockTarget);
+    setUnlockTarget(null);
+  }, [unlockNode, unlockTarget]);
+
+  const prerequisiteNodes = useMemo(() => {
+    if (!unlockTarget) return [];
+    const ids = getPrerequisiteIds(unlockTarget);
+    return ids
+      .map(id => allNodes.find(node => node.id === id))
+      .filter((node): node is KnowledgePoint => Boolean(node));
+  }, [allNodes, getPrerequisiteIds, unlockTarget]);
+
+  if (!profile) {
+    return <StudentGate onSignIn={signInProfile} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <StatusBar state={state} totalNodes={totalNodes} />
@@ -64,6 +109,14 @@ function App() {
           化学知识挑战树
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">沪教版初中化学 · 闯关解锁知识点</p>
+        <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+          <span className="truncate">
+            {profile.className} · {profile.classCode} · {profile.studentName}
+          </span>
+          <button onClick={signOutProfile} className="text-slate-500 hover:text-slate-300">
+            切换学生
+          </button>
+        </div>
       </div>
 
       <div className="max-w-lg mx-auto">
@@ -90,6 +143,16 @@ function App() {
           onClose={handleClose}
           onComplete={handleComplete}
           currentStreak={state.streak}
+          profile={profile}
+        />
+      )}
+
+      {unlockTarget && (
+        <UnlockChallengeModal
+          targetNode={unlockTarget}
+          prerequisiteNodes={prerequisiteNodes}
+          onClose={() => setUnlockTarget(null)}
+          onPass={handleUnlockPass}
         />
       )}
 
