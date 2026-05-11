@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { ClassAccess } from '../types';
+import type { ClassAccess, PlayerState } from '../types';
 import { validateClassCode } from '../services/classAccess';
+import { cloudLogin } from '../services/cloudSync';
 import { clearFailedLogins, getLoginBlockStatus, recordFailedLogin } from '../services/loginGuard';
 
 interface StudentGateProps {
-  onSignIn: (classAccess: ClassAccess, studentName: string, pin: string) => void;
+  onSignIn: (classAccess: ClassAccess, studentName: string, pin: string, cloudProgress?: PlayerState | null) => void;
 }
 
 export function StudentGate({ onSignIn }: StudentGateProps) {
@@ -60,10 +61,10 @@ export function StudentGate({ onSignIn }: StudentGateProps) {
     setError('');
     setIsChecking(true);
 
-    const result = await validateClassCode(classCode);
-    setIsChecking(false);
-
-    if (!result.ok || !result.classAccess) {
+    // 1. 校验班级码
+    const classResult = await validateClassCode(classCode);
+    if (!classResult.ok || !classResult.classAccess) {
+      setIsChecking(false);
       const nextBlockStatus = recordFailedLogin();
       if (nextBlockStatus.blocked) {
         setBlockedSeconds(nextBlockStatus.remainingSeconds);
@@ -71,7 +72,25 @@ export function StudentGate({ onSignIn }: StudentGateProps) {
       } else {
         setBlockedSeconds(0);
         setError(
-          `${result.message ?? '班级码不存在或已停用，请向老师确认'}。还可尝试 ${nextBlockStatus.attemptsRemaining} 次`,
+          `${classResult.message ?? '班级码不存在'}。还可尝试 ${nextBlockStatus.attemptsRemaining} 次`,
+        );
+      }
+      return;
+    }
+
+    // 2. 云端登录（校验 PIN + 获取进度）
+    const loginResult = await cloudLogin(classCode, studentName, cleanPin);
+    setIsChecking(false);
+
+    if (!loginResult.ok) {
+      const nextBlockStatus = recordFailedLogin();
+      if (nextBlockStatus.blocked) {
+        setBlockedSeconds(nextBlockStatus.remainingSeconds);
+        setError(`登录尝试过多，请 ${nextBlockStatus.remainingSeconds} 秒后再试`);
+      } else {
+        setBlockedSeconds(0);
+        setError(
+          `${loginResult.message ?? '登录失败'}。还可尝试 ${nextBlockStatus.attemptsRemaining} 次`,
         );
       }
       return;
@@ -79,7 +98,7 @@ export function StudentGate({ onSignIn }: StudentGateProps) {
 
     clearFailedLogins();
     setBlockedSeconds(0);
-    onSignIn(result.classAccess, studentName, cleanPin);
+    onSignIn(classResult.classAccess, studentName, cleanPin, loginResult.progress);
   };
 
   return (
@@ -133,27 +152,18 @@ export function StudentGate({ onSignIn }: StudentGateProps) {
           </label>
 
           {error && <p className="text-xs text-red-300">{error}</p>}
-          {import.meta.env.DEV && (
-            <div className="text-xs text-slate-500 space-y-0.5">
-              <p>本地可用班级码：</p>
-              <p><code className="text-cyan-400 bg-slate-800 px-1 rounded">DK2026</code> 本地测试班</p>
-              <p><code className="text-cyan-400 bg-slate-800 px-1 rounded">DK-CHEM-8B-7392</code> 八下化学冲刺班</p>
-              <p><code className="text-cyan-400 bg-slate-800 px-1 rounded">DK-CHEM-9A-4816</code> 九上一模衔接班</p>
-              <p><code className="text-cyan-400 bg-slate-800 px-1 rounded">DK-CHEM-DEMO-2605</code> 演示体验班</p>
-            </div>
-          )}
 
           <button
             type="submit"
             disabled={isChecking || blockedSeconds > 0}
             className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-600 disabled:text-slate-300 text-white rounded-xl font-medium transition-colors"
           >
-            {isChecking ? '校验班级码中...' : blockedSeconds > 0 ? '暂时停止登录' : '开始学习'}
+            {isChecking ? '校验中...' : blockedSeconds > 0 ? '暂时停止登录' : '开始学习'}
           </button>
         </form>
 
         <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-          班级码由老师统一发放。当前版本会按学生档案在本机保存进度，后续可接入云端同步。
+          班级码和 PIN 由老师统一发放。进度云端同步，换设备也能接着闯关。
         </p>
       </div>
     </div>

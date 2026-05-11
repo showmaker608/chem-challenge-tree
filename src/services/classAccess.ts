@@ -50,15 +50,15 @@ function validateDevClassCode(classCode: string): ClassCodeValidationResult {
 }
 
 export async function validateClassCode(classCode: string): Promise<ClassCodeValidationResult> {
-  // DEV 模式或生产环境未配置云函数时，使用本地班级码
-  const endpoint = import.meta.env.VITE_CLASS_CODE_VALIDATE_URL;
+  const base = import.meta.env.VITE_CLOUD_FUNCTION_BASE;
 
-  if (import.meta.env.DEV || !endpoint) {
+  // 本地开发或未配置云端时，使用本地班级码
+  if (!base) {
     return validateDevClassCode(classCode);
   }
 
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${base}/validateClassCode`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

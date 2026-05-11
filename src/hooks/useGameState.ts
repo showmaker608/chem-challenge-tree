@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ClassAccess, PlayerState, NodeState, StudentProfile } from '../types';
 import { XP_PER_NODE, XP_BONUS_STREAK, getLevel } from '../types';
+import { cloudSyncProgress } from '../services/cloudSync';
 
 const ACTIVE_PROFILE_KEY = 'chem-tree-active-profile';
 const PROGRESS_KEY_PREFIX = 'chem-tree-progress';
@@ -79,9 +80,21 @@ export function useGameState() {
   const [profile, setProfile] = useState<StudentProfile | null>(loadProfile);
   const [state, setState] = useState<PlayerState>(() => loadState(profile?.profileId ?? null));
 
+  // 保存到本地
   useEffect(() => {
     saveState(profile?.profileId ?? null, state);
   }, [profile?.profileId, state]);
+
+  // 同步到云端（防抖 3 秒）
+  const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    if (!profile) return;
+    clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      cloudSyncProgress(profile.classCode, profile.studentName, state);
+    }, 3000);
+    return () => clearTimeout(syncTimer.current);
+  }, [profile, state]);
 
   const getNodeState = useCallback(
     (nodeId: string): NodeState => {
@@ -191,7 +204,7 @@ export function useGameState() {
     }
   }, [profile]);
 
-  const signInProfile = useCallback((classAccess: ClassAccess, studentName: string, pin: string) => {
+  const signInProfile = useCallback((classAccess: ClassAccess, studentName: string, pin: string, cloudProgress?: PlayerState | null) => {
     const nextProfile: StudentProfile = {
       profileId: makeProfileId(classAccess.classCode, studentName, pin),
       classCode: classAccess.classCode.trim().toUpperCase(),
@@ -203,7 +216,13 @@ export function useGameState() {
 
     saveProfile(nextProfile);
     setProfile(nextProfile);
-    setState(loadState(nextProfile.profileId));
+
+    // 优先用云端进度，其次用本地进度
+    if (cloudProgress) {
+      setState({ ...defaultState, ...cloudProgress });
+    } else {
+      setState(loadState(nextProfile.profileId));
+    }
   }, []);
 
   const signOutProfile = useCallback(() => {

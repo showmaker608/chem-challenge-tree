@@ -1,0 +1,23 @@
+{
+  "envId": "xdkchem-d1g3f4ibw03b1b776",
+  "functions": [
+    {
+      "name": "validateClassCode",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "installDependency": false
+    },
+    {
+      "name": "studentLogin",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "installDependency": false
+    },
+    {
+      "name": "syncProgress",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "installDependency": false
+    }
+  ]
+}
