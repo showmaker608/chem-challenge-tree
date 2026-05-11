@@ -1,6 +1,6 @@
 import type { Chapter } from '../types';
 
-export const chapters: Chapter[] = [
+export const skillTreeChapters: Chapter[] = [
   {
     id: 'ch1',
     name: '走进化学世界',
@@ -1207,6 +1207,9 @@ export const chapters: Chapter[] = [
       },
     ],
   },
+];
+
+export const reviewChapters: Chapter[] = [
   {
     id: 'ch8',
     name: '八下期中复习',

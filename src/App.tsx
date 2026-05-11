@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import type { KnowledgePoint, StudentProfile } from './types';
-import { chapters } from './data/quizData';
+import { skillTreeChapters } from './data/quizData';
 import { useGameState } from './hooks/useGameState';
 import { SkillTree } from './components/SkillTree';
 import { QuizModal } from './components/QuizModal';
@@ -9,8 +9,10 @@ import { LandingPage } from './components/LandingPage';
 import { InviteGate } from './components/InviteGate';
 import { UnlockChallengeModal } from './components/UnlockChallengeModal';
 import { WrongBook } from './components/WrongBook';
+import { ModeSelect } from './components/ModeSelect';
+import { ReviewMode } from './components/ReviewMode';
 
-type AppMode = 'landing' | 'guest' | 'login' | 'game';
+type AppMode = 'landing' | 'guest' | 'login' | 'modeSelect' | 'skillTree' | 'reviewMode';
 
 function App() {
   const {
@@ -36,7 +38,7 @@ function App() {
   }), []);
 
   const allNodes = useMemo(
-    () => chapters.flatMap(ch => ch.sections.flatMap(sec => sec.nodes)),
+    () => skillTreeChapters.flatMap(ch => ch.sections.flatMap(sec => sec.nodes)),
     [],
   );
 
@@ -112,7 +114,7 @@ function App() {
   if (mode === 'landing') {
     return (
       <LandingPage
-        onGuest={() => setMode('guest')}
+        onGuest={() => setMode('modeSelect')}
         onLogin={() => setMode('login')}
       />
     );
@@ -123,14 +125,35 @@ function App() {
       <InviteGate
         onSignIn={(access, name, pin, progress, studentId) => {
           signInProfile(access, name, pin, progress, studentId);
-          setMode('game');
+          setMode('modeSelect');
         }}
         onBack={() => setMode('landing')}
       />
     );
   }
 
-  const isGuest = mode === 'guest';
+  if (mode === 'modeSelect') {
+    return (
+      <ModeSelect
+        onSkillTree={() => setMode('skillTree')}
+        onReview={() => setMode('reviewMode')}
+      />
+    );
+  }
+
+  if (mode === 'reviewMode') {
+    return (
+      <ReviewMode
+        profile={profile}
+        currentStreak={state.streak}
+        onComplete={completeNode}
+        onRecordWrong={recordWrong}
+        onBack={() => setMode('modeSelect')}
+      />
+    );
+  }
+
+  const isGuest = !profile;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -139,15 +162,20 @@ function App() {
       {/* 游客横幅 */}
       {isGuest && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center">
-          <span className="text-xs text-amber-300/80">
-            🎮 游客模式 · 进度不会保存
-          </span>
-          <button
-            onClick={() => setMode('login')}
-            className="ml-3 text-xs text-amber-400 hover:text-amber-300 underline"
-          >
-            登录保存进度
-          </button>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <button onClick={() => setMode('modeSelect')} className="text-xs text-slate-400 hover:text-slate-300">
+              ← 切换模式
+            </button>
+            <span className="text-xs text-amber-300/80">
+              🎮 游客模式 · 进度不会保存
+            </span>
+            <button
+              onClick={() => setMode('login')}
+              className="text-xs text-amber-400 hover:text-amber-300 underline"
+            >
+              登录保存进度
+            </button>
+          </div>
         </div>
       )}
 
@@ -157,24 +185,20 @@ function App() {
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">沪教版初中化学 · 闯关解锁知识点</p>
         {profile && (
-          <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
-            <span className="truncate">
-              {profile.className} · 学号{profile.studentId} · {profile.studentName}
-            </span>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowWrongBook(true)}
-                className="text-amber-400 hover:text-amber-300"
-              >
+          <div className="mt-2 space-y-1">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <button onClick={() => setMode('modeSelect')} className="text-slate-500 hover:text-slate-300">
+                ← 切换模式
+              </button>
+              <span className="text-slate-500 truncate">
+                {profile.className} · 学号{profile.studentId} · {profile.studentName}
+              </span>
+            </div>
+            <div className="flex gap-3 text-xs">
+              <button onClick={() => setShowWrongBook(true)} className="text-amber-400 hover:text-amber-300">
                 📝 错题本{state.wrongList.length > 0 ? `(${state.wrongList.length})` : ''}
               </button>
-              <button
-                onClick={() => {
-                  signOutProfile();
-                  setMode('landing');
-                }}
-                className="text-slate-500 hover:text-slate-300"
-              >
+              <button onClick={() => { signOutProfile(); setMode('landing'); }} className="text-slate-500 hover:text-slate-300">
                 退出登录
               </button>
             </div>
@@ -187,7 +211,7 @@ function App() {
 
       <div className="max-w-lg mx-auto">
         <SkillTree
-          chapters={chapters}
+          chapters={skillTreeChapters}
           completedNodes={state.completedNodes}
           availableNodes={availableNodes}
           onNodeClick={handleNodeClick}
