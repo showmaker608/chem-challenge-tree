@@ -31,15 +31,18 @@ interface QuizModalProps {
   node: KnowledgePoint;
   onClose: () => void;
   onComplete: (nodeId: string, score: number) => void;
+  onRecordWrong: (record: import('../types').WrongRecord) => void;
   currentStreak: number;
   profile: StudentProfile;
 }
 
-export function QuizModal({ node, onClose, onComplete, currentStreak, profile }: QuizModalProps) {
+export function QuizModal({ node, onClose, onComplete, onRecordWrong, currentStreak, profile }: QuizModalProps) {
   const [challengeIdx, setChallengeIdx] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
+  const [fillAnswer, setFillAnswer] = useState('');
   const [showResult, setShowResult] = useState(false);
   const [correct, setCorrect] = useState(0);
+  const [fillCorrect, setFillCorrect] = useState(false);
   const total = node.challenges.length;
   const [xpGained, setXpGained] = useState(0);
   const [showXpFloat, setShowXpFloat] = useState(false);
@@ -49,32 +52,67 @@ export function QuizModal({ node, onClose, onComplete, currentStreak, profile }:
   const [feedbackSaved, setFeedbackSaved] = useState(false);
 
   const challenge = node.challenges[challengeIdx];
+  const isFill = challenge?.type === 'fill';
 
   const handleSelect = (idx: number) => {
-    if (showResult) return;
+    if (showResult || isFill) return;
     setSelected(idx);
     setShowResult(true);
-    const isCorrect = idx === challenge.answer;
+    if (idx === challenge.answer) {
+      setCorrect(c => c + 1);
+      addXp();
+    } else {
+      onRecordWrong({
+        nodeId: node.id, nodeTopic: node.topic, challengeIdx,
+        stem: challenge.stem,
+        userAnswer: challenge.options[idx],
+        correctAnswer: challenge.options[challenge.answer],
+        explanation: challenge.explanation,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  };
+
+  const handleFillSubmit = () => {
+    if (showResult || !isFill || !fillAnswer.trim()) return;
+    const answers = challenge.fillAnswers ?? [];
+    const isCorrect = answers.some(a => a.toLowerCase() === fillAnswer.trim().toLowerCase());
+    setFillCorrect(isCorrect);
+    setShowResult(true);
     if (isCorrect) {
       setCorrect(c => c + 1);
-      const xp = XP_PER_NODE + (currentStreak >= 3 ? XP_BONUS_STREAK : 0);
-      setXpGained(prev => prev + xp);
-      setShowXpFloat(true);
-      setTimeout(() => setShowXpFloat(false), 1200);
+      addXp();
+    } else {
+      onRecordWrong({
+        nodeId: node.id, nodeTopic: node.topic, challengeIdx,
+        stem: challenge.stem,
+        userAnswer: fillAnswer.trim(),
+        correctAnswer: answers.join(' 或 '),
+        explanation: challenge.explanation,
+        timestamp: new Date().toISOString(),
+      });
     }
+  };
+
+  const addXp = () => {
+    const xp = XP_PER_NODE + (currentStreak >= 3 ? XP_BONUS_STREAK : 0);
+    setXpGained(prev => prev + xp);
+    setShowXpFloat(true);
+    setTimeout(() => setShowXpFloat(false), 1200);
   };
 
   const handleNext = () => {
     if (challengeIdx < node.challenges.length - 1) {
       setChallengeIdx(i => i + 1);
       setSelected(null);
+      setFillAnswer('');
+      setFillCorrect(false);
       setShowResult(false);
       setShowFeedback(false);
       setFeedbackText('');
       setFeedbackSaved(false);
     } else {
-      // 全部答完
-      const score = Math.round((correct + (selected === challenge.answer ? 1 : 0)) / total * 100);
+      const score = Math.round(correct / total * 100);
       onComplete(node.id, score);
       setIsComplete(true);
     }
@@ -160,9 +198,38 @@ export function QuizModal({ node, onClose, onComplete, currentStreak, profile }:
           <h3 className="text-base text-white leading-relaxed">{renderEq(challenge.stem)}</h3>
         </div>
 
-        {/* 选项 */}
+        {/* 选项 / 填空 */}
         <div className="space-y-2.5 mb-4">
-          {challenge.options.map((opt, i) => {
+          {isFill ? (
+            <div className="space-y-3">
+              <input
+                value={fillAnswer}
+                onChange={(event) => setFillAnswer(event.target.value)}
+                onKeyDown={(event) => { if (event.key === 'Enter') handleFillSubmit(); }}
+                disabled={showResult}
+                className="w-full rounded-xl bg-slate-900 border border-cyan-500/50 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400 placeholder-slate-500"
+                placeholder="输入你的答案..."
+                autoFocus
+              />
+              {!showResult && (
+                <button
+                  onClick={handleFillSubmit}
+                  disabled={!fillAnswer.trim()}
+                  className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl font-medium transition-colors"
+                >
+                  确认答案
+                </button>
+              )}
+              {showResult && (
+                <div className={`rounded-xl p-3 border ${fillCorrect ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300' : 'bg-red-900/30 border-red-500 text-red-300'}`}>
+                  <span className="text-sm">
+                    {fillCorrect ? '✅ 正确！' : `❌ 错误，正确答案：${(challenge.fillAnswers ?? []).join(' 或 ')}`}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            challenge.options.map((opt, i) => {
             let btnClass = "w-full text-left px-4 py-3 rounded-xl border transition-all text-sm ";
             if (showResult) {
               if (i === challenge.answer) {
@@ -182,7 +249,7 @@ export function QuizModal({ node, onClose, onComplete, currentStreak, profile }:
                 {renderEq(opt)}
               </button>
             );
-          })}
+          }))}
         </div>
 
         {/* 解析 */}

@@ -15,6 +15,7 @@ const defaultState: PlayerState = {
   unlockedNodes: [],
   nodeStates: {},
   achievements: [],
+  wrongList: [],
 };
 
 function makeProfileId(classCode: string, studentName: string, pin: string) {
@@ -85,10 +86,26 @@ export function useGameState() {
     saveState(profile?.profileId ?? null, state);
   }, [profile?.profileId, state]);
 
-  // 同步到云端（防抖 3 秒）
+  // 同步到云端（防抖 3 秒，但解锁/完成节点立即同步）
   const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const prevUnlockedLen = useRef(state.unlockedNodes.length);
+  const prevCompletedLen = useRef(state.completedNodes.length);
+
   useEffect(() => {
     if (!profile) return;
+
+    const unlockedChanged = state.unlockedNodes.length !== prevUnlockedLen.current;
+    const completedChanged = state.completedNodes.length !== prevCompletedLen.current;
+    prevUnlockedLen.current = state.unlockedNodes.length;
+    prevCompletedLen.current = state.completedNodes.length;
+
+    // 解锁或完成节点时立即同步
+    if (unlockedChanged || completedChanged) {
+      cloudSyncProgress(profile.classCode, profile.studentName, state);
+      return;
+    }
+
+    // 其他变化：防抖
     clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
       cloudSyncProgress(profile.classCode, profile.studentName, state);
@@ -197,6 +214,17 @@ export function useGameState() {
     }));
   }, []);
 
+  const recordWrong = useCallback((record: import('../types').WrongRecord) => {
+    setState((prev) => {
+      // 避免重复记录同一道题
+      const exists = prev.wrongList.some(
+        w => w.nodeId === record.nodeId && w.challengeIdx === record.challengeIdx
+      );
+      if (exists) return prev;
+      return { ...prev, wrongList: [record, ...prev.wrongList] };
+    });
+  }, []);
+
   const resetProgress = useCallback(() => {
     setState({ ...defaultState });
     if (profile?.profileId) {
@@ -204,12 +232,13 @@ export function useGameState() {
     }
   }, [profile]);
 
-  const signInProfile = useCallback((classAccess: ClassAccess, studentName: string, pin: string, cloudProgress?: PlayerState | null) => {
+  const signInProfile = useCallback((classAccess: ClassAccess, studentName: string, pin: string, cloudProgress?: PlayerState | null, studentId?: string) => {
     const nextProfile: StudentProfile = {
       profileId: makeProfileId(classAccess.classCode, studentName, pin),
       classCode: classAccess.classCode.trim().toUpperCase(),
       className: classAccess.className,
       studentName: studentName.trim(),
+      studentId: studentId ?? '',
       pin: pin.trim(),
       createdAt: new Date().toISOString(),
     };
@@ -239,6 +268,7 @@ export function useGameState() {
     completeNode,
     unlockNode,
     recordAttempt,
+    recordWrong,
     resetProgress,
     signInProfile,
     signOutProfile,

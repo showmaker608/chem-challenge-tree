@@ -8,6 +8,7 @@ import { StatusBar } from './components/StatusBar';
 import { LandingPage } from './components/LandingPage';
 import { InviteGate } from './components/InviteGate';
 import { UnlockChallengeModal } from './components/UnlockChallengeModal';
+import { WrongBook } from './components/WrongBook';
 
 type AppMode = 'landing' | 'guest' | 'login' | 'game';
 
@@ -18,6 +19,7 @@ function App() {
     isNodeAvailable,
     completeNode,
     unlockNode,
+    recordWrong,
     recordAttempt,
     resetProgress,
     signInProfile,
@@ -27,6 +29,7 @@ function App() {
   const [activeNode, setActiveNode] = useState<KnowledgePoint | null>(null);
   const [unlockTarget, setUnlockTarget] = useState<KnowledgePoint | null>(null);
   const [showReset, setShowReset] = useState(false);
+  const [showWrongBook, setShowWrongBook] = useState(false);
 
   const guestProfile: StudentProfile = useMemo(() => ({
     profileId: 'guest', classCode: '', className: '游客模式', studentName: '游客', pin: '', createdAt: '',
@@ -49,7 +52,7 @@ function App() {
       }
     }
     return set;
-  }, [allNodeIds, isNodeAvailable, state.completedNodes]);
+  }, [allNodeIds, isNodeAvailable, state.completedNodes, state.unlockedNodes]);
 
   const getPrerequisiteIds = useCallback((node: KnowledgePoint) => {
     if (node.prerequisites?.length) return node.prerequisites;
@@ -118,8 +121,8 @@ function App() {
   if (mode === 'login') {
     return (
       <InviteGate
-        onSignIn={(access, name, pin, progress) => {
-          signInProfile(access, name, pin, progress);
+        onSignIn={(access, name, pin, progress, studentId) => {
+          signInProfile(access, name, pin, progress, studentId);
           setMode('game');
         }}
         onBack={() => setMode('landing')}
@@ -156,17 +159,25 @@ function App() {
         {profile && (
           <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
             <span className="truncate">
-              {profile.className} · {profile.studentName}
+              {profile.className} · 学号{profile.studentId} · {profile.studentName}
             </span>
-            <button
-              onClick={() => {
-                signOutProfile();
-                setMode('landing');
-              }}
-              className="text-slate-500 hover:text-slate-300"
-            >
-              退出登录
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowWrongBook(true)}
+                className="text-amber-400 hover:text-amber-300"
+              >
+                📝 错题本{state.wrongList.length > 0 ? `(${state.wrongList.length})` : ''}
+              </button>
+              <button
+                onClick={() => {
+                  signOutProfile();
+                  setMode('landing');
+                }}
+                className="text-slate-500 hover:text-slate-300"
+              >
+                退出登录
+              </button>
+            </div>
           </div>
         )}
         {isGuest && (
@@ -197,6 +208,7 @@ function App() {
           node={activeNode}
           onClose={handleClose}
           onComplete={handleComplete}
+          onRecordWrong={recordWrong}
           currentStreak={state.streak}
           profile={profile ?? guestProfile}
         />
@@ -209,6 +221,10 @@ function App() {
           onClose={() => setUnlockTarget(null)}
           onPass={handleUnlockPass}
         />
+      )}
+
+      {showWrongBook && (
+        <WrongBook wrongList={state.wrongList} onClose={() => setShowWrongBook(false)} />
       )}
 
       {showReset && (

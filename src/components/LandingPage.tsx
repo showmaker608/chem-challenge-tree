@@ -46,12 +46,12 @@ export function LandingPage({ onGuest, onLogin }: LandingPageProps) {
             onClick={onLogin}
             className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium transition-colors border border-slate-700/50"
           >
-            🔑 学生登录
+            🔑 激活存档
           </button>
         </div>
 
         <p className="text-xs text-slate-600 mt-6">
-          已有老师发的邀请码？点「学生登录」输入邀请码和 PIN 即可恢复进度
+          想保存闯关进度？找老师要激活码，点「激活存档」即可开启云端同步
         </p>
       </div>
     </div>

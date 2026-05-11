@@ -5,7 +5,7 @@ import { cloudLogin } from '../services/cloudSync';
 import { clearFailedLogins, getLoginBlockStatus, recordFailedLogin } from '../services/loginGuard';
 
 interface InviteGateProps {
-  onSignIn: (classAccess: ClassAccess, studentName: string, pin: string, cloudProgress?: PlayerState | null) => void;
+  onSignIn: (classAccess: ClassAccess, studentName: string, pin: string, cloudProgress?: PlayerState | null, studentId?: string) => void;
   onBack: () => void;
 }
 
@@ -41,7 +41,7 @@ export function InviteGate({ onSignIn, onBack }: InviteGateProps) {
     }
 
     if (!inviteCode.trim() || !studentName.trim()) {
-      setError('请填写邀请码和姓名');
+      setError('请填写激活码和姓名');
       return;
     }
 
@@ -75,6 +75,7 @@ export function InviteGate({ onSignIn, onBack }: InviteGateProps) {
       studentName,
       cleanPin,
       result.progress,
+      result.profile?.studentId,
     );
   };
 
@@ -86,21 +87,21 @@ export function InviteGate({ onSignIn, onBack }: InviteGateProps) {
         <div className="mb-6">
           <div className="text-4xl mb-3">🔑</div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-            学生登录
+            激活账号
           </h1>
           <p className="text-sm text-slate-400 mt-2">
-            输入老师发给你的邀请码和 PIN，恢复你的闯关进度
+            输入老师发给你的激活码，存档你的闯关进度
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-slate-800/70 border border-slate-700/50 rounded-2xl p-5 space-y-4">
           <label className="block">
-            <span className="text-xs text-slate-400">邀请码</span>
+            <span className="text-xs text-slate-400">激活码</span>
             <input
               value={inviteCode}
               onChange={(event) => setInviteCode(event.target.value)}
               className="mt-1 w-full rounded-xl bg-slate-900 border border-slate-700 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
-              placeholder="老师给你的邀请码"
+              placeholder="老师给你的激活码"
               autoCapitalize="characters"
               disabled={isChecking}
             />
@@ -142,7 +143,7 @@ export function InviteGate({ onSignIn, onBack }: InviteGateProps) {
         </form>
 
         <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-          首次登录将自动创建账号。使用老师发给你的邀请码。忘记 PIN 请联系老师重置。
+          首次登录将自动创建账号。使用老师发给你的激活码。忘记 PIN 请联系老师重置。
         </p>
       </div>
     </div>

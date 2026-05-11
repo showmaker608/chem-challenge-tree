@@ -3,6 +3,8 @@ export interface Challenge {
   options: string[];
   answer: number;
   explanation: string;
+  type?: 'choice' | 'fill';  // 默认 choice
+  fillAnswers?: string[];      // 填空题可接受的正确答案列表
 }
 
 export interface KnowledgePoint {
@@ -42,6 +44,17 @@ export interface NodeState {
   attempts: number;
 }
 
+export interface WrongRecord {
+  nodeId: string;
+  nodeTopic: string;
+  challengeIdx: number;
+  stem: string;
+  userAnswer: string;
+  correctAnswer: string;
+  explanation: string;
+  timestamp: string;
+}
+
 export interface PlayerState {
   xp: number;
   level: number;
@@ -51,6 +64,7 @@ export interface PlayerState {
   unlockedNodes: string[];
   nodeStates: Record<string, NodeState>;
   achievements: string[];
+  wrongList: WrongRecord[];
 }
 
 export interface StudentProfile {
@@ -58,6 +72,7 @@ export interface StudentProfile {
   classCode: string;
   className: string;
   studentName: string;
+  studentId?: string;
   pin: string;
   createdAt: string;
 }

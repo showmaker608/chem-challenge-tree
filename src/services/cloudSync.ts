@@ -4,7 +4,7 @@ const BASE = import.meta.env.VITE_CLOUD_FUNCTION_BASE;
 
 interface LoginResult {
   ok: boolean;
-  profile?: StudentProfile;
+  profile?: StudentProfile & { studentId?: string };
   progress?: PlayerState | null;
   message?: string;
 }
