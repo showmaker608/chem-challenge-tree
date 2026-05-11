@@ -1,12 +1,15 @@
 import { useState, useMemo, useCallback } from 'react';
-import type { KnowledgePoint } from './types';
+import type { KnowledgePoint, StudentProfile } from './types';
 import { chapters } from './data/quizData';
 import { useGameState } from './hooks/useGameState';
 import { SkillTree } from './components/SkillTree';
 import { QuizModal } from './components/QuizModal';
 import { StatusBar } from './components/StatusBar';
-import { StudentGate } from './components/StudentGate';
+import { LandingPage } from './components/LandingPage';
+import { InviteGate } from './components/InviteGate';
 import { UnlockChallengeModal } from './components/UnlockChallengeModal';
+
+type AppMode = 'landing' | 'guest' | 'login' | 'game';
 
 function App() {
   const {
@@ -20,9 +23,14 @@ function App() {
     signInProfile,
     signOutProfile,
   } = useGameState();
+  const [mode, setMode] = useState<AppMode>('landing');
   const [activeNode, setActiveNode] = useState<KnowledgePoint | null>(null);
   const [unlockTarget, setUnlockTarget] = useState<KnowledgePoint | null>(null);
   const [showReset, setShowReset] = useState(false);
+
+  const guestProfile: StudentProfile = useMemo(() => ({
+    profileId: 'guest', classCode: '', className: '游客模式', studentName: '游客', pin: '', createdAt: '',
+  }), []);
 
   const allNodes = useMemo(
     () => chapters.flatMap(ch => ch.sections.flatMap(sec => sec.nodes)),
@@ -96,27 +104,74 @@ function App() {
       .filter((node): node is KnowledgePoint => Boolean(node));
   }, [allNodes, getPrerequisiteIds, unlockTarget]);
 
-  if (!profile) {
-    return <StudentGate onSignIn={signInProfile} />;
+  // ---- 路由分流 ----
+
+  if (mode === 'landing') {
+    return (
+      <LandingPage
+        onGuest={() => setMode('guest')}
+        onLogin={() => setMode('login')}
+      />
+    );
   }
+
+  if (mode === 'login') {
+    return (
+      <InviteGate
+        onSignIn={(access, name, pin, progress) => {
+          signInProfile(access, name, pin, progress);
+          setMode('game');
+        }}
+        onBack={() => setMode('landing')}
+      />
+    );
+  }
+
+  const isGuest = mode === 'guest';
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <StatusBar state={state} totalNodes={totalNodes} />
+
+      {/* 游客横幅 */}
+      {isGuest && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center">
+          <span className="text-xs text-amber-300/80">
+            🎮 游客模式 · 进度不会保存
+          </span>
+          <button
+            onClick={() => setMode('login')}
+            className="ml-3 text-xs text-amber-400 hover:text-amber-300 underline"
+          >
+            登录保存进度
+          </button>
+        </div>
+      )}
 
       <div className="px-4 pt-4 pb-2 max-w-lg mx-auto">
         <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
           化学知识挑战树
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">沪教版初中化学 · 闯关解锁知识点</p>
-        <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
-          <span className="truncate">
-            {profile.className} · {profile.classCode} · {profile.studentName}
-          </span>
-          <button onClick={signOutProfile} className="text-slate-500 hover:text-slate-300">
-            切换学生
-          </button>
-        </div>
+        {profile && (
+          <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+            <span className="truncate">
+              {profile.className} · {profile.studentName}
+            </span>
+            <button
+              onClick={() => {
+                signOutProfile();
+                setMode('landing');
+              }}
+              className="text-slate-500 hover:text-slate-300"
+            >
+              退出登录
+            </button>
+          </div>
+        )}
+        {isGuest && (
+          <p className="text-xs text-slate-600 mt-1">游客身份 · 进度仅本次有效</p>
+        )}
       </div>
 
       <div className="max-w-lg mx-auto">
@@ -143,7 +198,7 @@ function App() {
           onClose={handleClose}
           onComplete={handleComplete}
           currentStreak={state.streak}
-          profile={profile}
+          profile={profile ?? guestProfile}
         />
       )}
 

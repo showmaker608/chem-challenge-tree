@@ -30,51 +30,73 @@ exports.main = async (event) => {
   let payload;
   try { payload = parseBody(event); } catch { return json({ ok: false, message: '请求格式不正确' }, 400); }
 
-  const classCode = String(payload?.classCode ?? '').trim().toUpperCase();
-  const studentId = String(payload?.studentId ?? '').trim();
+  const inviteCode = String(payload?.classCode ?? '').trim().toUpperCase();
+  const studentName = String(payload?.studentId ?? '').trim();
   const pin = String(payload?.pin ?? '').trim();
 
-  if (!classCode || !studentId || !pin) {
-    return json({ ok: false, message: '请填写班级码、学号和 PIN' }, 400);
+  if (!inviteCode || !studentName || !pin) {
+    return json({ ok: false, message: '请填写邀请码、姓名和 PIN' }, 400);
   }
 
   if (!/^\d{4}$/.test(pin)) {
-    return json({ ok: false, message: 'PIN 格式不正确' }, 400);
+    return json({ ok: false, message: 'PIN 请输入 4 位数字' }, 400);
   }
 
-  // 1. 查班级码
-  const classRes = await db.collection('classes').where({ classCode, active: true }).limit(1).get();
-  const [classRecord] = classRes.data ?? [];
+  // 1. 查邀请码（优先查 invitations，兼容 classes）
+  let classRecord = null;
+  const invRes = await db.collection('invitations').where({ code: inviteCode, active: true }).limit(1).get();
+  if (invRes.data?.length) {
+    classRecord = invRes.data[0];
+    if (classRecord.maxUses && classRecord.usedCount >= classRecord.maxUses) {
+      return json({ ok: false, message: '邀请码已用完，请联系老师获取新码' });
+    }
+  } else {
+    // 向后兼容 classes 集合
+    const classRes = await db.collection('classes').where({ classCode: inviteCode, active: true }).limit(1).get();
+    if (classRes.data?.length) {
+      classRecord = classRes.data[0];
+    }
+  }
+
   if (!classRecord) {
-    return json({ ok: false, message: '班级码不存在或已停用' });
+    return json({ ok: false, message: '邀请码不存在或已停用，请向老师确认' });
   }
 
-  // 2. 查学生（classCode + studentId 唯一）
+  const className = classRecord.className ?? classRecord.name ?? '';
+
+  // 2. 查学生（inviteCode + studentName 唯一）
   const studentRes = await db.collection('students')
-    .where({ classCode, studentId })
+    .where({ classCode: inviteCode, studentId: studentName })
     .limit(1).get();
   const [student] = studentRes.data ?? [];
 
   if (!student) {
-    // 首次登录：自动注册
+    // 首次登录：自动注册 + 扣减邀请码次数
     const newStudent = {
-      classCode,
-      className: classRecord.className,
-      studentId,
-      studentName: studentId,
+      classCode: inviteCode,
+      className,
+      studentId: studentName,
+      studentName,
       pin,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     await db.collection('students').add(newStudent);
 
+    // 扣减 invitations 次数
+    if (invRes.data?.length) {
+      await db.collection('invitations').doc(classRecord._id).update({
+        usedCount: (classRecord.usedCount ?? 0) + 1,
+      });
+    }
+
     return json({
       ok: true,
       profile: {
-        profileId: `${classCode}:${studentId}:${pin}`,
-        classCode,
-        className: classRecord.className,
-        studentName: studentId,
+        profileId: `${inviteCode}:${studentName}:${pin}`,
+        classCode: inviteCode,
+        className,
+        studentName,
         pin,
         createdAt: newStudent.createdAt,
       },
@@ -87,22 +109,21 @@ exports.main = async (event) => {
     return json({ ok: false, message: 'PIN 不正确，如忘记请联系老师重置' });
   }
 
-  // 更新时间
   await db.collection('students').doc(student._id).update({ updatedAt: new Date().toISOString() });
 
   // 3. 读取进度
   const progressRes = await db.collection('progress')
-    .where({ studentKey: `${classCode}:${studentId}` })
+    .where({ studentKey: `${inviteCode}:${studentName}` })
     .limit(1).get();
   const [progress] = progressRes.data ?? [];
 
   return json({
     ok: true,
     profile: {
-      profileId: `${classCode}:${studentId}:${pin}`,
-      classCode,
-      className: classRecord.className,
-      studentName: studentId,
+      profileId: `${inviteCode}:${studentName}:${pin}`,
+      classCode: inviteCode,
+      className,
+      studentName,
       pin,
       createdAt: student.createdAt,
     },
