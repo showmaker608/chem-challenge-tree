@@ -50,3 +50,4 @@
 /* Combo hint shown in the play preview bar when a combo card is selected. */
 .cg-preview-combo{display:block;color:#ffd98a;font-size:11px;line-height:1.5}
 .cg-preview-combo::before{content:'⚗ ';color:#e6c77d}
+.cg-effect-line{color:#f6dfa1!important;line-height:1.55}.cg-card-details{text-align:left}.cg-card-details .cg-inspect-art{display:flex;justify-content:center}.cg-card-details h2,.cg-card-details .cg-detail-kind{text-align:center}.cg-card-details .cg-detail-kind{color:#e6c77d;font-size:12px;text-transform:uppercase;letter-spacing:1px}.cg-card-details section{margin-top:13px;padding:10px 12px;border:1px solid #b89a5655;border-radius:10px;background:#0c211a44}.cg-card-details h3{margin:0 0 5px;font-size:13px;color:#ffe4a0}.cg-card-details section p{margin:4px 0;font-size:12px}.cg-card-details .cg-dialog-controls{background:transparent}
