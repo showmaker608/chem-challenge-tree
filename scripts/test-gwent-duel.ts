@@ -47,15 +47,16 @@ assert.equal(score(g, 0), 27); assert.equal(power(g, 0, g.players[0].board[0]), 
 g = play(g, 'peroxide'); g = play(g, 'catalyst'); g = play(g, 'splint'); assert.equal(score(g, 0), 48, 'mentor only triggers once');
 g = fresh(); g = play(g, 'carbonate'); g = play(g, 'acid'); g = play(g, 'limewater'); g = play(g, 'mentor'); assert.equal(score(g, 0), 25, 'no retroactive mentor');
 const records = structuredClone(g.experiments);
-g = play(g, 'challenge', 1, 'limewater'); assert.equal(score(g, 0), 20); assert.deepEqual(g.experiments, records);
-assert.equal(cardState(g, 0, card('limewater')), '奖励待复核'); assert.equal(reactionBonus(g, 0, card('limewater')), 5);
-g = play(g, 'review', 0, 'limewater'); assert.equal(score(g, 0), 25); assert.deepEqual(g.experiments, records);
+g = play(g, 'challenge', 1, 'limewater'); assert.equal(score(g, 0), 16, 'challenge pauses every reward in one carbon experiment'); assert.deepEqual(g.experiments, records);
+for (const key of ['carbonate', 'acid', 'limewater']) assert.equal(cardState(g, 0, card(key)), '奖励待复核');
+assert.equal(reactionBonus(g, 0, card('limewater')), 5, 'the chemical result remains recorded');
+g = play(g, 'review', 0, 'carbonate'); assert.equal(score(g, 0), 25, 'review restores the whole disputed record'); assert.deepEqual(g.experiments, records);
 g = play(g, 'witness'); g = play(g, 'challenge', 1, 'limewater'); assert.equal(score(g, 0), 30); assert.deepEqual(g.tactics!.witnessUsed, [0]);
 // Give the opponent a second distinct challenge solely to test the once-per-round guard.
-g.turn = 1; g.players[1].hand.push(card('challenge', '-second')); g = act(g, { type: 'card', id: 'challenge-second', target: 'limewater' }); assert.equal(score(g, 0), 25);
+g.turn = 1; g.players[1].hand.push(card('challenge', '-second')); g = act(g, { type: 'card', id: 'challenge-second', target: 'limewater' }); assert.equal(score(g, 0), 21, 'witness blocks one whole record, not a single card');
 assert.deepEqual(skillTargets(g, 0, card('relay')), [], 'reacted materials, catalyst, heroes cannot be recalled');
 
-g = fresh(); g = play(g, 'copper'); g = play(g, 'measure', 0, 'copper'); assert.equal(score(g, 0), 9);
+g = fresh(); g = play(g, 'copper'); g = play(g, 'measure', 0, 'copper'); assert.equal(score(g, 0), 10);
 assert.deepEqual(skillTargets(g, 0, card('measure')), [], 'no repeated measure'); assert.deepEqual(skillTargets(g, 0, card('relay')), [], 'cannot recall boosted card');
 g = fresh(); g = play(g, 'limewater'); g.players[0].hand.push(card('carbonate'));
 g = play(g, 'relay', 0, 'limewater', 'carbonate'); assert.equal(score(g, 0), 4); assert.equal(g.players[0].hand[0].key, 'limewater'); assert.equal(g.players[0].discard[0].key, 'relay');

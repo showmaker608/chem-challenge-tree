@@ -108,6 +108,13 @@ export type Action = { type: 'swap'; id: string; with?: string } | { type: 'star
 export function isUnusedMaterial(g: Game, side: Side, c: Card): boolean {
   return c.ability === 'unit' && !(g.tactics?.boosts[c.id]) && !(g.experiments?.[side] || []).some(e => e.cards.includes(c.id) || e.testedBy === c.id);
 }
+/** A dispute pauses points for one experiment record; it never undoes chemistry. */
+function experimentForCard(g: Game, side: Side, cardId: string): Experiment | undefined {
+  return (g.experiments?.[side] || []).find(e => e.cards.includes(cardId) || e.testedBy === cardId);
+}
+function experimentRewardIds(record: Experiment): string[] {
+  return [...record.cards, ...(record.testedBy ? [record.testedBy] : [])];
+}
 export function skillTargets(g: Game, side: Side, c: Card): Card[] {
   const other: Side = side === 0 ? 1 : 0;
   if (c.skill === 'challenge') return g.players[other].board.filter(x => x.ability === 'unit' && reactionBonus(g, other, x) > 0 && !g.tactics?.disputed.includes(x.id));
@@ -154,13 +161,24 @@ export function act(state: Game, action: Action): Game {
     p.hand.splice(i, 1); message = `打出「${c.name}」`;
     if (c.ability === 'tactic') {
       const t = g.tactics!;
-      if (c.skill === 'measure') { t.boosts[action.target!] = 3; message += '，精密测量 +3'; }
+      if (c.skill === 'measure') { t.boosts[action.target!] = 4; message += '，精密测量 +4'; }
       if (c.skill === 'challenge') {
         const witness = g.players[other].board.find(x => x.skill === 'witness');
         if (witness && !t.witnessUsed.includes(other)) { t.witnessUsed.push(other); message += '，被见证者挡下'; }
-        else { t.disputed.push(action.target!); message += '，对手的组合奖励待复核'; }
+        else {
+          const record = experimentForCard(g, other, action.target!);
+          if (!record) return state;
+          t.disputed.push(...experimentRewardIds(record));
+          message += `，${record.product}实验成果奖励待复核`;
+        }
       }
-      if (c.skill === 'review') { t.disputed = t.disputed.filter(id => id !== action.target); message += '，恢复组合奖励'; }
+      if (c.skill === 'review') {
+        const record = experimentForCard(g, side, action.target!);
+        if (!record) return state;
+        const disputed = new Set(experimentRewardIds(record));
+        t.disputed = t.disputed.filter(id => !disputed.has(id));
+        message += `，恢复${record.product}实验成果奖励`;
+      }
       if (c.skill === 'relay') {
         const target = p.board.find(x => x.id === action.target)!;
         const replacement = p.hand.find(x => x.id === action.replacement)!;

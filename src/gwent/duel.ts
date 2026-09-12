@@ -8,12 +8,12 @@ const extraKeys = ['phosphorus', 'magnesium', 'water', 'flame'];
 const allKeys = [...keys, ...extraKeys];
 export const collection: Card[] = [
   ...pool.map((c, i): Card => ({ ...c, id: allKeys[i], key: allKeys[i], ability: 'unit', row: 0 })),
-  { id: 'measure', key: 'measure', name: '精密测量', symbol: '强化', power: 0, row: 0, ability: 'tactic', skill: 'measure', fact: '选择己方一张未反应、未获奖励的物质牌，本局 +3 分。同一张牌不能重复强化。' },
-  { id: 'challenge', key: 'challenge', name: '成果质疑', symbol: '干扰', power: 0, row: 0, ability: 'tactic', skill: 'challenge', fact: '选择对方一张有组合奖励的物质牌，扣除其组合奖励，直到复核或本局结束。不影响基础分和已经发生的化学事实。' },
-  { id: 'review', key: 'review', name: '实验复核', symbol: '反制', power: 0, row: 0, ability: 'tactic', skill: 'review', fact: '选择己方一张奖励待复核的物质牌，解除成果质疑，恢复它的组合奖励。' },
-  { id: 'relay', key: 'relay', name: '紧急调度', symbol: '调度', power: 0, row: 0, ability: 'tactic', skill: 'relay', fact: '收回己方一张未反应、未获奖励的物质牌，同时从手牌换上一张物质牌。已参与反应的催化剂也不能收回。战术牌用后弃置。' },
+  { id: 'measure', key: 'measure', name: '精密测量', symbol: '强化', power: 0, row: 0, ability: 'tactic', skill: 'measure', fact: '选择己方一张未反应、未获奖励的物质牌，本局 +4 分。同一张牌不能重复强化；测量后不能再被紧急调度收回。' },
+  { id: 'challenge', key: 'challenge', name: '成果质疑', symbol: '干扰', power: 0, row: 0, ability: 'tactic', skill: 'challenge', fact: '选择对方一条已有组合奖励的实验成果中的任意物质牌，该实验记录的全部组合奖励待复核，直到复核或本局结束。不影响基础分和已经发生的化学事实。' },
+  { id: 'review', key: 'review', name: '实验复核', symbol: '反制', power: 0, row: 0, ability: 'tactic', skill: 'review', fact: '选择己方一条奖励待复核的实验成果中的任意物质牌，解除这条实验记录的待复核状态，恢复该记录全部组合奖励。不会撤销或重做化学反应。' },
+  { id: 'relay', key: 'relay', name: '紧急调度', symbol: '调度', power: 0, row: 0, ability: 'tactic', skill: 'relay', fact: '收回己方一张未反应、未获奖励、未测量的物质牌，同时从手牌换上一张物质牌。已参与反应的催化剂也不能收回。战术牌用后弃置。' },
   { id: 'mentor', key: 'mentor', name: '实验导师', symbol: '英雄', power: 5, row: 0, ability: 'hero', skill: 'mentor', fact: '在场期间，己方首次完成一次新的检验接力，导师额外 +2 分。每局一次；不会追溯入场前的检验。' },
-  { id: 'witness', key: 'witness', name: '见证者', symbol: '英雄', power: 5, row: 0, ability: 'hero', skill: 'witness', fact: '在场期间，自动替己方物质牌挡下一次成果质疑。每局一次；不能解除入场前的质疑。' },
+  { id: 'witness', key: 'witness', name: '见证者', symbol: '英雄', power: 5, row: 0, ability: 'hero', skill: 'witness', fact: '在场期间，自动替己方一条实验成果挡下一次成果质疑。每局一次；不能解除入场前的质疑。' },
   { id: 'spy', key: 'spy', name: '访问学者', symbol: '间谍', power: 4, row: 0, ability: 'spy', fact: '进入对方实验台，给对方 4 分；自己从备用牌库抽 2 张。不足两张时有多少抽多少。不查看或偷取对方手牌。' },
 ];
 export const cardByKey = new Map(collection.map(c => [c.key!, c]));
