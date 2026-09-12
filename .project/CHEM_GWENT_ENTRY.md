@@ -71,3 +71,13 @@
 - 引擎：链定义泛化为 chains 表（carbon/oxygen/hydrogen），cardState/reactionBonus 走表驱动；新增 chainNames/comboInfo。
 - UI：卡牌说明弹窗（对局+组牌）显示配合提示（⚗ + 搭档、产物、检验、分值）；卡面右上角对有配合的牌加 ⚗ 徽章引导思考。
 - 燃着的木条立绘生成（风格参考 peroxide-v2，裁水印）；collection 21、立绘 17。全部测试通过。
+
+## 2026-09-12 codex 四路并行改进同步
+
+- 用户在 codex 开了多个对话并行改进，基于 0a35802 产生 4 个分支提交，已全部合入 chem-gwent-v2（38ead12 之后）：
+  - c68b26a 紧凑对局布局：空场地压缩高度、对局摘要栏（cg-battle-status）、操作栏吸底，手牌首屏可达。
+  - a2343d3 对局战报：MatchActionFeed（公开动作反馈条，反应/检验/挑战/保护/复盘分类着色）+ RoundRecap（回合小结），新增 matchEvents.ts 与 test-gwent-events.ts。
+  - 1564d64 卡牌澄清 + 直接换牌：换牌阶段点手牌直接选换出、点备用牌直接选换入（原弹窗按钮流程简化）；新增 GwentCardDetails 组件统一卡牌详情弹窗；预览条改为 selectedEffect 行 + 「ⓘ 说明」按钮。
+  - 96b88d0 对手人格：chooseAI 增加 style（opponentId），rush/relay/guard 三种风格轮换（takeOpponentTurn），行为可区分（抢分链/接力/防守停牌决策不同）；duel.ts 增加 opponentById/opponentFor。
+- 合并取舍：战报 recordAction 与对手人格 style 参数在 AI 效果中并存；startQuick 保留战报状态重置；紧凑布局的 battle-status 摘要栏保留，换牌提示文案采用 codex 新版。
+- 冲突解决后 tsc + 全部 5 个测试脚本通过（含对手人格、战报事件新增断言）。
