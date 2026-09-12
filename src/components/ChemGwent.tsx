@@ -9,6 +9,8 @@ import { gameAsset } from '../gwent/artwork';
 import { INTRO_KEY, createQuickMatch, quickHint } from '../gwent/entry';
 import { GwentDeckBuilder } from './GwentDeckBuilder';
 import { GwentCardFace } from './GwentCardFace';
+import { MatchActionFeed, RoundRecap } from './MatchActionFeed';
+import { keyRoundEvent, matchEvent } from '../gwent/matchEvents';
 import './ChemGwent.css';
 import './ChemGwentArt.css';
 import './GwentDeckBuilder.css';
@@ -45,6 +47,8 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
   const [dealtId, setDealtId] = useState<string>();
   useEffect(() => { if (!dealtId) return; const timer = window.setTimeout(() => setDealtId(undefined), 900); return () => window.clearTimeout(timer); }, [dealtId]);
   const [duelEvent, setDuelEvent] = useState<string>('');
+  const [recentAction, setRecentAction] = useState<ReturnType<typeof matchEvent>>(null);
+  const [roundActions, setRoundActions] = useState<NonNullable<ReturnType<typeof matchEvent>>[]>([]);
   useEffect(() => { if (!duelEvent) return; const timer = window.setTimeout(() => setDuelEvent(''), 2800); return () => clearTimeout(timer); }, [duelEvent]);
   useEffect(() => {
     const close = (e: KeyboardEvent) => { if (e.key === 'Escape') { setInspect(null); setConfirmPass(false); setConfirmExit(false); } };
@@ -81,7 +85,7 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
   useEffect(() => { const hide = () => { if (document.hidden) void audio.current?.pause(); else if (started) void audio.current?.start(musicOn, fxOn, volume).catch(() => setAudioError(true)); }; document.addEventListener('visibilitychange', hide); return () => document.removeEventListener('visibilitychange', hide); }, [started, musicOn, fxOn, volume]);
   function soundStart() { void audio.current?.start(musicOn, fxOn, volume).then(() => setAudioError(false)).catch(() => setAudioError(true)); }
   function rememberIntro() { setReturning(true); try { localStorage.setItem(INTRO_KEY, 'done'); } catch { /* The match still works without persistence. */ } }
-  function home() { setStarted(false); setBuilding(false); setRules(false); setConfirmExit(false); setConfirmPass(false); setSelected(null); setInspect(null); setSwapOut(undefined); setSwapIn(undefined); setBurst(null); setDuelEvent(''); void audio.current?.pause(); }
+  function home() { setStarted(false); setBuilding(false); setRules(false); setConfirmExit(false); setConfirmPass(false); setSelected(null); setInspect(null); setSwapOut(undefined); setSwapIn(undefined); setBurst(null); setDuelEvent(''); setRecentAction(null); setRoundActions([]); void audio.current?.pause(); }
   const card = game.players[0].hand.find(c => c.id === selected);
   const canPlay = started && game.phase === 'play' && game.turn === 0 && !game.players[0].passed;
   function describe(before: Game, next: Game, action: Action): string {
@@ -99,13 +103,20 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
     const count = next.players[before.turn].board.filter(x => x.name === c.name).length;
     return `${who}打出「${c.name}」：${c.ability === 'bond' && count > 1 ? `${count} 张同名组合，每张 ${c.power} × ${count} = ${power(next, before.turn, c)} 分。` : `${c.power} 分。`}总分 ${score(before, before.turn)} → ${score(next, before.turn)}。`;
   }
-  function dispatch(action: Action) { const next = act(game, action); if (next === game) return; setGame(next); if (intro && next.phase === 'over') rememberIntro(); setNotice(describe(game, next, action)); setSelected(null); setTarget(undefined); setReplacement(undefined); setConfirmPass(false); respond(game, next); }
+  function recordAction(before: Game, next: Game, action: Action) {
+    const event = matchEvent(before, next, action);
+    if (action.type === 'next') { setRecentAction(null); setRoundActions([]); return; }
+    if (!event) return;
+    setRecentAction(event);
+    setRoundActions(actions => [...actions, event]);
+  }
+  function dispatch(action: Action) { const next = act(game, action); if (next === game) return; setGame(next); if (intro && next.phase === 'over') rememberIntro(); setNotice(describe(game, next, action)); recordAction(game, next, action); setSelected(null); setTarget(undefined); setReplacement(undefined); setConfirmPass(false); respond(game, next); }
   useEffect(() => {
     if (!started || building || game.phase !== 'play' || game.turn !== 1 || burst || duelEvent) return;
-    const timer = window.setTimeout(() => { const action = game.duel ? chooseAI(game, { level: difficulty }) : easyAI(game, lesson); const next = act(game, action); setGame(next); if (intro && next.phase === 'over') rememberIntro(); setNotice(describe(game, next, action)); respond(game, next); }, 1500);
+    const timer = window.setTimeout(() => { const action = game.duel ? chooseAI(game, { level: difficulty }) : easyAI(game, lesson); const next = act(game, action); setGame(next); if (intro && next.phase === 'over') rememberIntro(); setNotice(describe(game, next, action)); recordAction(game, next, action); respond(game, next); }, 1500);
     return () => window.clearTimeout(timer);
   }, [game, started, lesson, burst, duelEvent, building, intro, difficulty]);
-  function begin(next: Lesson) { setIntro(false); setRules(false); setBuilding(false); setBurst(null); setDuelEvent(''); setLesson(next); setGame(createLesson(next)); setSelected(null); setTarget(undefined); setReplacement(undefined); setSwapOut(undefined); setSwapIn(undefined); setInspect(null); setNotice('你先手。点击手牌，再点出牌。'); setStarted(true); setConfirmPass(false); soundStart(); }
+  function begin(next: Lesson) { setIntro(false); setRules(false); setBuilding(false); setBurst(null); setDuelEvent(''); setRecentAction(null); setRoundActions([]); setLesson(next); setGame(createLesson(next)); setSelected(null); setTarget(undefined); setReplacement(undefined); setSwapOut(undefined); setSwapIn(undefined); setInspect(null); setNotice('你先手。点击手牌，再点出牌。'); setStarted(true); setConfirmPass(false); soundStart(); }
   function saveDeck(keys: string[]) {
     setDeckKeys(keys); setSaveError(false); try { localStorage.setItem('chem-gwent-deck-v1', JSON.stringify(keys)); setHomeNotice('牌组已保存，下一场就用它。'); } catch { setSaveError(true); setHomeNotice('牌组本次可用，但浏览器未允许保存。'); }
     rememberIntro(); home();
@@ -113,7 +124,7 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
   function startQuick(forceDuel = false) {
     const experienced = returning || forceDuel;
     if (forceDuel) rememberIntro();
-    setGame(createQuickMatch(deckKeys, experienced)); setIntro(!experienced); setHints(true); setLesson(experienced ? 'practice' : 'bond'); setRules(false); setStarted(true); setBuilding(false); setSelected(null); setTarget(undefined); setReplacement(undefined); setSwapOut(undefined); setSwapIn(undefined); setInspect(null); setBurst(null); setDuelEvent(''); setNotice(experienced ? '牌组已带好，可以直接开战，也可换两张起手牌。' : '你先手，选一张手牌开始对决。'); setConfirmPass(false); setHomeNotice(''); soundStart();
+    setGame(createQuickMatch(deckKeys, experienced)); setIntro(!experienced); setHints(true); setLesson(experienced ? 'practice' : 'bond'); setRules(false); setStarted(true); setBuilding(false); setSelected(null); setTarget(undefined); setReplacement(undefined); setSwapOut(undefined); setSwapIn(undefined); setInspect(null); setBurst(null); setDuelEvent(''); setRecentAction(null); setRoundActions([]); setNotice(experienced ? '牌组已带好，可以直接开战，也可换两张起手牌。' : '你先手，选一张手牌开始对决。'); setConfirmPass(false); setHomeNotice(''); soundStart();
   }
   const hint = intro && hints ? quickHint(game) : null;
   const playAction: Action | null = card ? { type: 'card', id: card.id, target, replacement } : null;
@@ -146,13 +157,14 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
     {building ? <GwentDeckBuilder initial={deckKeys} onSave={saveDeck} onClose={()=>setBuilding(false)} /> : !started ? <section className="cg-welcome"><span className="cg-kicker">CHEMICAL COMPANIONS</span><h2>让化学伙伴，<br />产生一点反应。</h2><p>巧妙组合，赢下这一局。</p><div className="cg-showcase" aria-label="化学伙伴卡牌预览">{['acid','peroxide','limewater'].map(chemical=>tile(createLesson('bond').players[0].hand.find(c=>c.chemical===chemical)!,undefined,true))}</div><div className="cg-home-actions"><button className="primary cg-start" onClick={()=>startQuick()}>开始对决<span aria-hidden="true">→</span></button><button className="cg-deck-link" onClick={()=>{setBuilding(true);setHomeNotice('');setRules(false);}}>我的牌组</button></div><div className="cg-difficulty" role="group" aria-label="对手强度"><span>对手强度</span><button aria-pressed={difficulty==='easy'} onClick={()=>pickDifficulty('easy')}>轻松 · 它会犯错</button><button aria-pressed={difficulty==='normal'} onClick={()=>pickDifficulty('normal')}>认真 · 全力计算</button></div>{homeNotice&&<p role="status" className="cg-home-notice">{homeNotice}</p>}</section> : <>
       <section className="cg-coach"><small>{game.duel?`自由对战 · ${difficulty==='easy'?'轻松对手':'全力对手'}`:intro?'入门练习赛':lessonNames[lesson].replace(/^\d · /,'练习 · ')} · 第 {game.round} 局</small>{!intro&&lesson!=='practice'&&<details><summary>提示</summary><p>{guide(game, lesson)}</p></details>}{game.duel&&<details><summary>对战记录</summary>{game.log.slice(-6).map((line,i)=><p key={i}>{line}</p>)}</details>}{intro&&hints&&<button className="cg-dismiss-hint" onClick={()=>{setHints(false);rememberIntro();}}>关闭引导</button>}</section>
       {saveError&&<p role="alert">浏览器未允许保存牌组，本局仍可正常游玩。</p>}
+      <MatchActionFeed event={recentAction} />
       {duelEvent&&<div className="cg-duel-event" role="status">{duelEvent}</div>}
       {game.phase==='mulligan'&&<section className="cg-mulligan"><p className="cg-mulligan-tip">点卡看说明 · 最多换 {2-game.swaps} 张 · {game.starter===0?'你先手':'电脑先手'}</p><div className="cg-mulligan-picks"><span className={swapOutCard?'filled':''}>{swapOutCard?swapOutCard.name:'换出'}</span><b aria-hidden="true">⇄</b><span className={swapInCard?'filled':''}>{swapInCard?swapInCard.name:'换入'}</span><button disabled={!swapOutCard||!swapInCard} onClick={confirmSwap}>交换</button></div><div className="cg-mulligan-actions"><button className="primary" onClick={()=>dispatch({type:'start'})}>开战</button><button onClick={()=>setBuilding(true)}>组牌</button></div></section>}
       {game.phase!=='mulligan'&&<div className="cg-layout"><div className="cg-table" style={{backgroundImage:`url('${gameAsset('table-v2.webp')}')`}}>{board(1)}<div className="cg-divider"><strong aria-live="polite">{game.phase !== 'play' ? game.result : game.turn === 0 ? '轮到你了' : '电脑准备出牌…'}</strong><span>你 {score(game, 0)} : {score(game, 1)} 电脑</span></div>{board(0)}</div></div>}
       {([0,1] as const).map(side => (game.experiments?.[side] || []).map(e=><details className="cg-experiment" key={e.id} aria-label={`${side===0?'你的':'电脑的'}${e.product}反应记录`}><summary><strong>{side===0?'你':'电脑'}</strong><span className={`cg-product ${e.testedBy?'tested':''} ${side===0&&card?.chemical===chainText[e.kind].tester&&!e.testedBy?'ready':''}`}>产物 {e.product} · {e.testedBy?'已检验':'如何检验呢？'}</span></summary>{e.testedBy&&<p>{chainText[e.kind].testedDetail} · 接力＋5</p>}<details><summary>查看反应记录</summary><p>{chainText[e.kind].equation}</p><p>{chainText[e.kind].productsNote}本局只开放气体的一次检验接力。分数记录实验成果，不表示物质数量。</p>{e.testedBy&&<p>{chainText[e.kind].testedNote}</p>}</details></details>))}
 
       <div className="cg-sr-only" role="status" key={notice}>{notice || '下一局开始，剩余手牌继续使用。'}</div>
-      {(game.phase === 'round' || game.phase === 'over') && <section className="cg-result"><h2>{game.result}</h2><p>本局总分：你 {score(game, 0)} · 电脑 {score(game, 1)}</p><p>{game.phase === 'round' ? `你还剩 ${game.players[0].hand.length} 张牌，将全部保留到下一局。` : '换个思路，再来一场。'}</p>{game.phase === 'round' ? <button className="primary" onClick={() => dispatch({ type: 'next' })}>下一局 · 保留手牌</button> : <><button className="primary" onClick={() => startQuick(true)}>再来一局</button><button onClick={() => setBuilding(true)}>调整牌组</button></>}</section>}
+      {(game.phase === 'round' || game.phase === 'over') && <section className="cg-result"><h2>{game.result}</h2><p>本局总分：你 {score(game, 0)} · 电脑 {score(game, 1)}</p><RoundRecap event={keyRoundEvent(roundActions)} /><p>{game.phase === 'round' ? `你还剩 ${game.players[0].hand.length} 张牌，将全部保留到下一局。` : '换个思路，再来一场。'}</p>{game.phase === 'round' ? <button className="primary" onClick={() => dispatch({ type: 'next' })}>下一局 · 保留手牌</button> : <><button className="primary" onClick={() => startQuick(true)}>再来一局</button><button onClick={() => setBuilding(true)}>调整牌组</button></>}</section>}
       {hint&&<div className="cg-quick-hint" role="status">{hint}</div>}
       <section className="cg-hand"><div className="cg-hand-head"><strong>你的手牌 · {game.players[0].hand.length}</strong><small>{game.phase==='mulligan'?'点卡看说明':'点选出牌 · 双击看说明'}</small></div><div className="cg-hand-cards">{game.players[0].hand.map(c => tile(c))}{!game.players[0].hand.length && <p>没有手牌了，点“本局不再出牌”进入结算。</p>}</div></section>
       {game.phase==='mulligan'&&<section className="cg-hand cg-spare"><div className="cg-hand-head"><strong>备用牌 · {game.players[0].deck.length}</strong><small>换入从这里挑</small></div><div className="cg-hand-cards">{game.players[0].deck.map(c => tile(c))}</div></section>}
