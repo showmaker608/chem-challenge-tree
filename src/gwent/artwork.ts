@@ -8,8 +8,10 @@ const portraits: Record<string, string> = {
   carbonate: 'carbonate', acid: 'acid', limewater: 'limewater',
   peroxide: 'peroxide', catalyst: 'catalyst', splint: 'splint',
   Cu: 'copper', Fe: 'iron', 'N₂': 'nitrogen', 'SiO₂': 'silica',
+  P: 'phosphorus', Mg: 'magnesium', 'H₂O': 'water',
   mentor: 'mentor', witness: 'witness', spy: 'spy',
   copper: 'copper', iron: 'iron', nitrogen: 'nitrogen', silica: 'silica',
+  phosphorus: 'phosphorus', magnesium: 'magnesium', water: 'water',
 };
 
 /** Text and chemistry remain in the UI; portraits are artistic personifications. */

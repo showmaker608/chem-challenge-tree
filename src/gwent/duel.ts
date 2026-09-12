@@ -4,8 +4,10 @@ import { pool } from './onboarding';
 
 export const DECK_SIZE = 16;
 const keys = ['carbonate', 'acid', 'limewater', 'peroxide', 'catalyst', 'splint', 'copper', 'iron', 'nitrogen', 'silica'];
+const extraKeys = ['phosphorus', 'magnesium', 'water'];
+const allKeys = [...keys, ...extraKeys];
 export const collection: Card[] = [
-  ...pool.map((c, i): Card => ({ ...c, id: keys[i], key: keys[i], ability: 'unit', row: 0 })),
+  ...pool.map((c, i): Card => ({ ...c, id: allKeys[i], key: allKeys[i], ability: 'unit', row: 0 })),
   { id: 'measure', key: 'measure', name: '精密测量', symbol: '强化', power: 0, row: 0, ability: 'tactic', skill: 'measure', fact: '选择己方一张未反应、未获奖励的物质牌，本局 +3 分。同一张牌不能重复强化。' },
   { id: 'challenge', key: 'challenge', name: '成果质疑', symbol: '干扰', power: 0, row: 0, ability: 'tactic', skill: 'challenge', fact: '选择对方一张有组合奖励的物质牌，扣除其组合奖励，直到复核或本局结束。不影响基础分和已经发生的化学事实。' },
   { id: 'review', key: 'review', name: '实验复核', symbol: '反制', power: 0, row: 0, ability: 'tactic', skill: 'review', fact: '选择己方一张奖励待复核的物质牌，解除成果质疑，恢复它的组合奖励。' },

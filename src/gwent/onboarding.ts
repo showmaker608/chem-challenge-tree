@@ -12,7 +12,10 @@ export const pool: Omit<Card, 'id' | 'ability' | 'row'>[] = [
  {name:'铜丝',symbol:'Cu',power:6,fact:'铜具有良好的导电性。'},
  {name:'铁钉',symbol:'Fe',power:4,fact:'铁属于金属单质。'},
  {name:'氮气',symbol:'N₂',power:5,fact:'空气中氮气的体积分数约为78%。'},
- {name:'二氧化硅',symbol:'SiO₂',power:6,fact:'二氧化硅属于氧化物。'}
+ {name:'二氧化硅',symbol:'SiO₂',power:6,fact:'二氧化硅属于氧化物。'},
+ {name:'红磷',symbol:'P',power:4,fact:'红磷燃烧消耗氧气、生成五氧化二磷固体，可用于测定空气中氧气的含量。'},
+ {name:'镁带',symbol:'Mg',power:5,fact:'镁在空气中燃烧发出耀眼的白光，生成白色固体氧化镁。'},
+ {name:'蒸馏水',symbol:'H₂O',power:3,fact:'电解水生成氢气和氧气，体积比约为2:1。'}
 ];
 export function createLesson(lesson: Lesson): Game {
  const g=createGame(); g.experiments=[[],[]];

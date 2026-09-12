@@ -8,7 +8,7 @@ const fresh = () => { const g = act(createDuel(presets[0].cards, presets[1].card
 function play(g: Game, key: string, side: Side = 0, target?: string, replacement?: string): Game {
   g.turn = side; const c = card(key); g.players[side].hand.push(c); const next = act(g, { type: 'card', id: c.id, target, replacement }); assert.notEqual(next, g, `${key} action legal`); return next;
 }
-assert.equal(collection.length, 17);
+assert.equal(collection.length, 20);
 for (const p of presets) { assert.deepEqual(deckErrors(p.cards), []); assert.notDeepEqual([...opponentFor(p.cards).cards].sort(), [...p.cards].sort()); }
 assert.ok(deckErrors([]).length);
 assert.ok(deckErrors([...presets[0].cards, 'mentor']).length);
