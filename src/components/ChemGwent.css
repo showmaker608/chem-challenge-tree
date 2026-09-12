@@ -46,3 +46,7 @@
 .cg-card .cg-combo{position:absolute;right:3%;top:2%;z-index:5;font-size:15px;color:#e6c77d;text-shadow:0 1px 3px #000a;opacity:.92;pointer-events:none}
 .cg-combo-info{margin-top:8px!important;padding:8px 10px;border:1px solid #b89a5666;border-radius:9px;background:#234b4055;color:#ffe3a0!important;font-size:13px!important;text-align:left}
 @media(max-width:600px){.cg-card .cg-combo{font-size:12px}}
+
+/* Combo hint shown in the play preview bar when a combo card is selected. */
+.cg-preview-combo{display:block;color:#ffd98a;font-size:11px;line-height:1.5}
+.cg-preview-combo::before{content:'⚗ ';color:#e6c77d}
