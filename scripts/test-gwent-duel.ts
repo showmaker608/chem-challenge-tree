@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { act, cardActions, cardState, chooseAI, power, reactionBonus, score, skillTargets } from '../src/gwent/engine';
+import { act, cardActions, cardState, chooseAI, comboInfo, power, reactionBonus, score, skillTargets } from '../src/gwent/engine';
 import type { Card, Game, Side } from '../src/gwent/engine';
 import { collection, createDuel, deckErrors, opponentFor, presets, readDeck } from '../src/gwent/duel';
 
@@ -8,7 +8,7 @@ const fresh = () => { const g = act(createDuel(presets[0].cards, presets[1].card
 function play(g: Game, key: string, side: Side = 0, target?: string, replacement?: string): Game {
   g.turn = side; const c = card(key); g.players[side].hand.push(c); const next = act(g, { type: 'card', id: c.id, target, replacement }); assert.notEqual(next, g, `${key} action legal`); return next;
 }
-assert.equal(collection.length, 20);
+assert.equal(collection.length, 21);
 for (const p of presets) { assert.deepEqual(deckErrors(p.cards), []); assert.notDeepEqual([...opponentFor(p.cards).cards].sort(), [...p.cards].sort()); }
 assert.ok(deckErrors([]).length);
 assert.ok(deckErrors([...presets[0].cards, 'mentor']).length);
@@ -95,3 +95,17 @@ for (let n = 0; n < 20; n++) {
   assert.equal(eg.phase, 'over'); assert.ok(eg.round <= 3);
 }
 console.log('PASS: deck validation/persistence recovery, mulligan, spy 0/1/2 draws, both heroes, challenge/review, relay restrictions, round cleanup, 200 full constructed matches, hidden-hand independence, easy-AI behavior and 20 easy matches.');
+
+// Hydrogen chain: metal + acid -> H2, tested by flame (lit splint); either metal qualifies.
+g = fresh(); g = play(g, 'iron'); g = play(g, 'acid');
+assert.equal(g.experiments![0].length, 1); assert.equal(g.experiments![0][0].kind, 'hydrogen');
+assert.equal(score(g, 0), 16, 'metal+acid production: 4+4 plus 4+4 bonus');
+g = play(g, 'flame'); assert.ok(g.experiments![0][0].testedBy, 'flame tests hydrogen');
+assert.equal(score(g, 0), 23, 'tested hydrogen: 16 + flame 2 + relay 5');
+g = fresh(); g = play(g, 'magnesium'); g = play(g, 'acid'); assert.equal(g.experiments![0][0].kind, 'hydrogen', 'magnesium also works as the metal');
+g = fresh(); g = play(g, 'iron'); g = play(g, 'acid'); g = play(g, 'splint'); assert.equal(g.experiments![0][0].testedBy, undefined, 'glowing splint cannot test hydrogen');
+g = fresh(); g = play(g, 'carbonate'); g = play(g, 'acid'); g = play(g, 'iron');
+assert.equal(g.experiments![0].length, 1); assert.equal(g.experiments![0][0].kind, 'carbon', 'consumed acid cannot start a second chain');
+g = fresh(); g = play(g, 'peroxide'); g = play(g, 'catalyst'); g = play(g, 'flame'); assert.equal(g.experiments![0][0].testedBy, undefined, 'flame cannot test oxygen');
+assert.ok(comboInfo('metal')[0].includes('H₂')); assert.ok(comboInfo('flame')[0].includes('+5')); assert.deepEqual(comboInfo('copper'), []);
+console.log('PASS: hydrogen chain (both metals, flame test, wrong testers rejected, acid exclusivity, combo info).');

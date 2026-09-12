@@ -8,14 +8,14 @@ const portraits: Record<string, string> = {
   carbonate: 'carbonate', acid: 'acid', limewater: 'limewater',
   peroxide: 'peroxide', catalyst: 'catalyst', splint: 'splint',
   Cu: 'copper', Fe: 'iron', 'N₂': 'nitrogen', 'SiO₂': 'silica',
-  P: 'phosphorus', Mg: 'magnesium', 'H₂O': 'water',
+  P: 'phosphorus', Mg: 'magnesium', 'H₂O': 'water', 火焰: 'flame',
   mentor: 'mentor', witness: 'witness', spy: 'spy',
   copper: 'copper', iron: 'iron', nitrogen: 'nitrogen', silica: 'silica',
-  phosphorus: 'phosphorus', magnesium: 'magnesium', water: 'water',
+  phosphorus: 'phosphorus', magnesium: 'magnesium', water: 'water', flame: 'flame',
 };
 
 /** Text and chemistry remain in the UI; portraits are artistic personifications. */
 export function cardPortrait(card: Pick<Card, 'chemical' | 'symbol' | 'key'>): string | undefined {
-  const name = portraits[card.key || card.chemical || card.symbol];
+  const name = (card.key && portraits[card.key]) || (card.chemical && portraits[card.chemical]) || (card.symbol && portraits[card.symbol]);
   return name ? gameAsset(`${name}-v2.webp`) : undefined;
 }

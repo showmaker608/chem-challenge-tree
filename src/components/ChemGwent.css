@@ -41,3 +41,8 @@
 .cg-difficulty{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:14px;font-size:12px;color:#b0c2a9}
 .cg-difficulty button{padding:7px 12px;font-size:12px;border-radius:999px}
 .cg-difficulty button[aria-pressed=true]{background:#dfc98e;color:#1a4033;border-color:#f5dea2;font-weight:700}
+
+/* Combo badge on card faces and combo hints in dialogs. */
+.cg-card .cg-combo{position:absolute;right:3%;top:2%;z-index:5;font-size:15px;color:#e6c77d;text-shadow:0 1px 3px #000a;opacity:.92;pointer-events:none}
+.cg-combo-info{margin-top:8px!important;padding:8px 10px;border:1px solid #b89a5666;border-radius:9px;background:#234b4055;color:#ffe3a0!important;font-size:13px!important;text-align:left}
+@media(max-width:600px){.cg-card .cg-combo{font-size:12px}}

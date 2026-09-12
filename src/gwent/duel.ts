@@ -4,7 +4,7 @@ import { pool } from './onboarding';
 
 export const DECK_SIZE = 16;
 const keys = ['carbonate', 'acid', 'limewater', 'peroxide', 'catalyst', 'splint', 'copper', 'iron', 'nitrogen', 'silica'];
-const extraKeys = ['phosphorus', 'magnesium', 'water'];
+const extraKeys = ['phosphorus', 'magnesium', 'water', 'flame'];
 const allKeys = [...keys, ...extraKeys];
 export const collection: Card[] = [
   ...pool.map((c, i): Card => ({ ...c, id: allKeys[i], key: allKeys[i], ability: 'unit', row: 0 })),

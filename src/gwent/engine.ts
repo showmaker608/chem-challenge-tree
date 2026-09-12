@@ -2,8 +2,27 @@ export type Row = 0 | 1 | 2;
 export type Side = 0 | 1;
 export type Ability = 'unit' | 'bond' | 'spy' | 'hero' | 'tactic' | 'weather' | 'clear' | 'horn' | 'scorch';
 export type Skill = 'measure' | 'challenge' | 'review' | 'relay' | 'mentor' | 'witness';
-export interface Card { id: string; key?: string; skill?: Skill; name: string; symbol: string; power: number; row: Row; ability: Ability; fact: string; reagent?: 'peroxide' | 'catalyst'; chemical?: 'carbonate' | 'acid' | 'peroxide' | 'catalyst' | 'limewater' | 'splint' }
-export interface Experiment { id: string; kind: 'oxygen' | 'carbon'; cards: string[]; product: 'O₂' | 'CO₂'; testedBy?: string }
+export interface Card { id: string; key?: string; skill?: Skill; name: string; symbol: string; power: number; row: Row; ability: Ability; fact: string; reagent?: 'peroxide' | 'catalyst'; chemical?: 'carbonate' | 'acid' | 'peroxide' | 'catalyst' | 'limewater' | 'splint' | 'metal' | 'flame' }
+export interface Experiment { id: string; kind: 'oxygen' | 'carbon' | 'hydrogen'; cards: string[]; product: 'O₂' | 'CO₂' | 'H₂'; testedBy?: string }
+export interface Chain { kind: Experiment['kind']; materials: [string, string]; product: Experiment['product']; tester: string }
+export const chains: Chain[] = [
+  { kind: 'carbon', materials: ['carbonate', 'acid'], product: 'CO₂', tester: 'limewater' },
+  { kind: 'oxygen', materials: ['peroxide', 'catalyst'], product: 'O₂', tester: 'splint' },
+  { kind: 'hydrogen', materials: ['metal', 'acid'], product: 'H₂', tester: 'flame' },
+];
+export const chainNames: Record<string, string> = { carbonate: '碳酸钙', acid: '稀盐酸', limewater: '澄清石灰水', peroxide: '过氧化氢溶液', catalyst: '二氧化锰', splint: '带火星的木条', metal: '铁钉/镁带', flame: '燃着的木条' };
+export const chainBonus = (kind: Experiment['kind']) => kind === 'carbon' ? 2 : 4;
+/** Human-readable combo hints for a card's chemical role; shown in the card detail dialog. */
+export function comboInfo(chemical?: string): string[] {
+  if (!chemical) return [];
+  const lines: string[] = [];
+  for (const ch of chains) {
+    const mi = ch.materials.indexOf(chemical);
+    if (mi >= 0) lines.push(`与「${chainNames[ch.materials[1 - mi]]}」配合生成${ch.product}（各 +${chainBonus(ch.kind)}），再由「${chainNames[ch.tester]}」检验 +5`);
+    if (ch.tester === chemical) lines.push(`检验「${chainNames[ch.materials[0]]}」与「${chainNames[ch.materials[1]]}」生成的${ch.product}，接力 +5`);
+  }
+  return lines;
+}
 export interface Player { hand: Card[]; deck: Card[]; board: Card[]; discard: Card[]; horns: Row[]; lives: number; passed: boolean; leader: boolean }
 export interface Tactics { boosts: Record<string, number>; disputed: string[]; mentorUsed: Side[]; witnessUsed: Side[] }
 export interface Game { players: [Player, Player]; weather: Row[]; turn: Side; starter: Side; round: number; phase: 'mulligan' | 'play' | 'round' | 'over'; swaps: number; swapped: string[]; log: string[]; result: string; experiments?: [Experiment[], Experiment[]]; duel?: boolean; tactics?: Tactics }
@@ -14,23 +33,24 @@ export function cardState(g: Game, side: Side, c: Card): string {
   if (c.skill === 'witness') return g.tactics?.witnessUsed.includes(side) ? '守护已用' : '守护就绪';
   if (c.ability === 'spy') return '对手派来的间谍';
   const records = g.experiments?.[side] || [];
-  if (records.some(e => e.testedBy === c.id)) return c.chemical === 'limewater' ? '已反应 · 变浑浊' : '已检验 · 复燃';
+  if (records.some(e => e.testedBy === c.id)) return c.chemical === 'limewater' ? '已反应 · 变浑浊' : c.chemical === 'flame' ? '已检验 · 爆鸣' : '已检验 · 复燃';
   if (records.some(e => e.cards.includes(c.id))) return c.chemical === 'catalyst' ? '催化剂 · 未消耗' : '已反应';
-  return c.chemical === 'catalyst' ? '催化剂' : c.chemical === 'limewater' || c.chemical === 'splint' ? '检验待命' : '';
+  return c.chemical === 'catalyst' ? '催化剂' : c.chemical === 'limewater' || c.chemical === 'splint' || c.chemical === 'flame' ? '检验待命' : '';
 }
 function resolveExperiment(g: Game, side: Side) {
   if (!g.experiments) return;
   const records = g.experiments[side];
-  for (const [kind, a, b, product] of [['carbon', 'carbonate', 'acid', 'CO₂'], ['oxygen', 'peroxide', 'catalyst', 'O₂']] as const) {
-    if (records.some(e => e.kind === kind)) continue;
+  for (const chain of chains) {
+    if (records.some(e => e.kind === chain.kind)) continue;
     const available = g.players[side].board.filter(x => !records.some(e => e.cards.includes(x.id)));
-    const first = available.find(x => x.chemical === a), second = available.find(x => x.chemical === b);
-    if (first && second) records.push({ id: `${g.round}-${side}-${kind}`, kind, cards: [first.id, second.id], product });
+    const first = available.find(x => x.chemical === chain.materials[0]), second = available.find(x => x.chemical === chain.materials[1]);
+    if (first && second) records.push({ id: `${g.round}-${side}-${chain.kind}`, kind: chain.kind, cards: [first.id, second.id], product: chain.product });
   }
   // Prepared inspection materials wait on this side's bench, independent of play order.
   for (const record of records) {
     if (record.testedBy) continue;
-    const tester = g.players[side].board.find(x => x.chemical === (record.kind === 'carbon' ? 'limewater' : 'splint') && !records.some(e => e.testedBy === x.id));
+    const chain = chains.find(c => c.kind === record.kind)!;
+    const tester = g.players[side].board.find(x => x.chemical === chain.tester && !records.some(e => e.testedBy === x.id));
     if (tester) record.testedBy = tester.id;
   }
 }
@@ -73,7 +93,7 @@ export function reactionPair(g: Game, side: Side): Card[] {
   return peroxide && catalyst ? [peroxide, catalyst] : [];
 }
 export function reactionBonus(g: Game, side: Side, c: Card): number {
-  if (g.experiments) return g.experiments[side].reduce((sum, e) => sum + (e.cards.includes(c.id) ? e.kind === 'carbon' ? 2 : 4 : 0) + (e.testedBy === c.id ? 5 : 0), 0);
+  if (g.experiments) return g.experiments[side].reduce((sum, e) => sum + (e.cards.includes(c.id) ? chainBonus(e.kind) : 0) + (e.testedBy === c.id ? 5 : 0), 0);
   return reactionPair(g, side).some(x => x.id === c.id) ? 4 : 0;
 }
 export function power(g: Game, side: Side, c: Card): number {

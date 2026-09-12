@@ -25,5 +25,5 @@ for (const card of collection.filter(c => c.ability !== 'tactic')) {
   assert.ok(existsSync(`public${path.replace('.webp', '.png')}`), `${card.name} source preserved`);
   distinct.add(path);
 }
-assert.equal(distinct.size, 16, 'Thirteen materials plus three distinct role portraits');
-console.log('PASS: sixteen distinct portraits; all lessons and constructed roles mapped; original assets preserved.');
+assert.equal(distinct.size, 17, 'Fourteen materials plus three distinct role portraits');
+console.log('PASS: seventeen distinct portraits; all lessons and constructed roles mapped; original assets preserved.');

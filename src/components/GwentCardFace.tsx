@@ -14,6 +14,7 @@ export function GwentCardFace({ card, value = card.power, state = '' }: { card: 
       {card.ability === 'tactic' && <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="50" cy="50" r="44" strokeWidth="1" /><path d={emblems[card.skill || '']} /></svg>}
     </span>
     <span className="cg-symbol">{card.symbol}</span><strong>{card.name}</strong>
+    {card.chemical && <span className="cg-combo" aria-hidden="true">⚗</span>}
     <small>{state || (card.ability === 'spy' ? '潜入 · 抽 2 张' : card.chemical === 'catalyst' ? '催化剂' : '')}</small>
     {value !== card.power && <span className={`cg-equation ${value < card.power ? 'negative' : ''}`}>{value > card.power ? '+' : ''}{value - card.power}</span>}
   </>;

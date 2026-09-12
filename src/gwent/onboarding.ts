@@ -10,12 +10,13 @@ export const pool: Omit<Card, 'id' | 'ability' | 'row'>[] = [
  {name:'二氧化锰',symbol:'MnO₂',power:2,chemical:'catalyst',fact:'催化剂反应前后质量和化学性质不变。每局一次组合奖励是游戏限制，不代表催化剂只能使用一次。'},
  {name:'带火星的木条',symbol:'木条',power:2,chemical:'splint',fact:'伸入收集的氧气中，木条复燃。此处是检验，不是验满。'},
  {name:'铜丝',symbol:'Cu',power:6,fact:'铜具有良好的导电性。'},
- {name:'铁钉',symbol:'Fe',power:4,fact:'铁属于金属单质。'},
+ {name:'铁钉',symbol:'Fe',power:4,chemical:'metal',fact:'铁属于金属单质；铁与稀盐酸反应生成氯化亚铁和氢气。'},
  {name:'氮气',symbol:'N₂',power:5,fact:'空气中氮气的体积分数约为78%。'},
  {name:'二氧化硅',symbol:'SiO₂',power:6,fact:'二氧化硅属于氧化物。'},
  {name:'红磷',symbol:'P',power:4,fact:'红磷燃烧消耗氧气、生成五氧化二磷固体，可用于测定空气中氧气的含量。'},
- {name:'镁带',symbol:'Mg',power:5,fact:'镁在空气中燃烧发出耀眼的白光，生成白色固体氧化镁。'},
- {name:'蒸馏水',symbol:'H₂O',power:3,fact:'电解水生成氢气和氧气，体积比约为2:1。'}
+ {name:'镁带',symbol:'Mg',power:5,chemical:'metal',fact:'镁与稀盐酸反应生成氯化镁和氢气；在空气中燃烧发出耀眼白光。'},
+ {name:'蒸馏水',symbol:'H₂O',power:3,fact:'电解水生成氢气和氧气，体积比约为2:1。'},
+ {name:'燃着的木条',symbol:'火焰',power:2,chemical:'flame',fact:'点燃收集的氢气，发出爆鸣声。氢气可燃，点燃前必须验纯；此处是检验氢气。'}
 ];
 export function createLesson(lesson: Lesson): Game {
  const g=createGame(); g.experiments=[[],[]];

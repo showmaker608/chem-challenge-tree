@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { act, power, score, cardState, chooseAI, skillTargets, cardActions } from '../gwent/engine';
-import type { Action, Card, Game, Side } from '../gwent/engine';
+import { act, power, score, cardState, chooseAI, skillTargets, cardActions, comboInfo } from '../gwent/engine';
+import type { Action, Card, Game, Side, Experiment } from '../gwent/engine';
 import { createLesson, easyAI, guide, lessonNames } from '../gwent/onboarding';
 import type { Lesson } from '../gwent/onboarding';
 import { TableAudio } from '../gwent/audio';
@@ -13,6 +13,11 @@ import './ChemGwent.css';
 import './ChemGwentArt.css';
 import './GwentDeckBuilder.css';
 function preferences() { try { return JSON.parse(localStorage.getItem('chem-gwent-audio') || '{}'); } catch { return {}; } }
+const chainText: Record<Experiment['kind'], { tester: string; testedTitle: string; testedDetail: string; produceDetail: string; effect: string; playLabel: string; describe: string; equation: string; productsNote: string; testedNote: string }> = {
+  carbon: { tester: 'limewater', testedTitle: '变浑浊', testedDetail: '二氧化碳通入石灰水 · 变浑浊', produceDetail: '碳酸钙＋稀盐酸 → 生成二氧化碳', effect: 'cloud', playLabel: '通入石灰水', describe: '石灰水变浑浊', equation: 'CaCO₃ + 2HCl → CaCl₂ + H₂O + CO₂↑', productsNote: '完整生成物：氯化钙、水、二氧化碳。', testedNote: 'CO₂ + Ca(OH)₂ → CaCO₃↓ + H₂O；本次少量气体检验到此结束。' },
+  oxygen: { tester: 'splint', testedTitle: '复燃', testedDetail: '带火星的木条复燃', produceDetail: '二氧化锰催化 · 生成氧气', effect: 'fire', playLabel: '伸入木条', describe: '木条复燃', equation: '2H₂O₂ → 2H₂O + O₂↑（二氧化锰催化）', productsNote: '完整生成物：水、氧气。二氧化锰未消耗。', testedNote: '氧气支持木条燃烧，木条复燃；检验到此结束。' },
+  hydrogen: { tester: 'flame', testedTitle: '爆鸣', testedDetail: '点燃氢气 · 发出爆鸣声', produceDetail: '金属＋稀盐酸 → 生成氢气', effect: 'fire', playLabel: '点燃气体', describe: '氢气爆鸣', equation: 'Fe + 2HCl → FeCl₂ + H₂↑（镁带亦可：Mg + 2HCl → MgCl₂ + H₂↑）', productsNote: '金属与稀盐酸反应生成盐和氢气。', testedNote: '氢气燃烧生成水；可燃气体点燃前必须验纯，检验到此结束。' },
+};
 export function ChemGwent({ onBack }: { onBack: () => void }) {
   const [lesson, setLesson] = useState<Lesson>('first');
   const [game, setGame] = useState<Game>(() => createLesson('first'));
@@ -63,7 +68,7 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
     const created = !previous.some(p => p.id === record.id);
     const mentorBonus = next.tactics?.mentorUsed.includes(side) && !before.tactics?.mentorUsed.includes(side) ? 2 : 0;
     const bonus = (created ? record.kind === 'carbon' ? 4 : 8 : 0) + (tested ? 5 : 0) + mentorBonus;
-    setBurst({id: `${record.id}-${tested}`, side, title: tested ? record.kind === 'carbon' ? '变浑浊' : '复燃' : '生成气体', detail: tested ? record.kind === 'carbon' ? '二氧化碳通入石灰水 · 变浑浊' : '带火星的木条复燃' : record.kind === 'carbon' ? '碳酸钙＋稀盐酸 → 生成二氧化碳' : '二氧化锰催化 · 生成氧气', bonus, effect: tested ? record.kind === 'carbon' ? 'cloud' : 'fire' : 'gas', cards: [...record.cards, ...(record.testedBy ? [record.testedBy] : [])]});
+    setBurst({id: `${record.id}-${tested}`, side, title: tested ? chainText[record.kind].testedTitle : '生成气体', detail: tested ? chainText[record.kind].testedDetail : chainText[record.kind].produceDetail, bonus, effect: tested ? chainText[record.kind].effect : 'gas', cards: [...record.cards, ...(record.testedBy ? [record.testedBy] : [])]});
     audio.current?.effect(tested ? 'inspect' : 'reaction');
   }
   const [musicOn, setMusicOn] = useState<boolean>(() => preferences().music !== false);
@@ -89,7 +94,7 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
     if (c.ability !== 'unit' && before.duel) return next.log[next.log.length - 1];
     const records = next.experiments?.[before.turn] || [];
     const completed = records.find(e => e.testedBy && !before.experiments?.[before.turn].some(old => old.id === e.id && old.testedBy));
-    if (completed) return `${who}完成检验：${completed.kind === "carbon" ? "石灰水变浑浊" : "木条复燃"}。总分 ${score(before,before.turn)} → ${score(next,before.turn)}。`;
+    if (completed) return `${who}完成检验：${chainText[completed.kind].describe}。总分 ${score(before,before.turn)} → ${score(next,before.turn)}。`;
     if (records.length > (before.experiments?.[before.turn].length || 0)) return `${who}完成制气，生成${records[records.length-1].product}。如何检验呢？`;
     const count = next.players[before.turn].board.filter(x => x.name === c.name).length;
     return `${who}打出「${c.name}」：${c.ability === 'bond' && count > 1 ? `${count} 张同名组合，每张 ${c.power} × ${count} = ${power(next, before.turn, c)} 分。` : `${c.power} 分。`}总分 ${score(before, before.turn)} → ${score(next, before.turn)}。`;
@@ -120,7 +125,7 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
     ? !cardActions(game, 0, card).length ? '目前没有可用目标，可选择其他牌' : !target ? '点击发光的场上牌，选择目标' : card.skill === 'relay' && !replacement ? '再点击要换上的手牌' : '目标已选定'
     : card.ability === 'spy' ? `给对手 4 分 · 抽 ${Math.min(2, game.players[0].deck.length)} 张备用牌` : card.ability === 'hero' ? card.fact : '';
   const inspection = preview?.experiments?.[0].find(e => e.testedBy === card?.id && !game.experiments?.[0].some(old => old.testedBy === card?.id));
-  const playLabel = inspection ? inspection.kind === 'carbon' ? '通入石灰水' : '伸入木条' : '出牌';
+  const playLabel = inspection ? chainText[inspection.kind].playLabel : '出牌';
   const swapOutCard = game.players[0].hand.find(c => c.id === swapOut);
   const swapInCard = game.players[0].deck.find(c => c.id === swapIn);
   const inspectZone = inspect ? game.players[0].hand.some(c => c.id === inspect.id) ? 'hand' : game.players[0].deck.some(c => c.id === inspect.id) ? 'deck' : null : null;
@@ -143,7 +148,7 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
       {duelEvent&&<div className="cg-duel-event" role="status">{duelEvent}</div>}
       {game.phase==='mulligan'&&<section className="cg-mulligan"><p className="cg-mulligan-tip">点卡看说明 · 最多换 {2-game.swaps} 张 · {game.starter===0?'你先手':'电脑先手'}</p><div className="cg-mulligan-picks"><span className={swapOutCard?'filled':''}>{swapOutCard?swapOutCard.name:'换出'}</span><b aria-hidden="true">⇄</b><span className={swapInCard?'filled':''}>{swapInCard?swapInCard.name:'换入'}</span><button disabled={!swapOutCard||!swapInCard} onClick={confirmSwap}>交换</button></div><div className="cg-mulligan-actions"><button className="primary" onClick={()=>dispatch({type:'start'})}>开战</button><button onClick={()=>setBuilding(true)}>组牌</button></div></section>}
       {game.phase!=='mulligan'&&<div className="cg-layout"><div className="cg-table" style={{backgroundImage:`url('${gameAsset('table-v2.webp')}')`}}>{board(1)}<div className="cg-divider"><strong aria-live="polite">{game.phase !== 'play' ? game.result : game.turn === 0 ? '轮到你了' : '电脑准备出牌…'}</strong><span>你 {score(game, 0)} : {score(game, 1)} 电脑</span></div>{board(0)}</div></div>}
-      {([0,1] as const).map(side => (game.experiments?.[side] || []).map(e=><details className="cg-experiment" key={e.id} aria-label={`${side===0?'你的':'电脑的'}${e.product}反应记录`}><summary><strong>{side===0?'你':'电脑'}</strong><span className={`cg-product ${e.testedBy?'tested':''} ${side===0&&card?.chemical===(e.kind==='carbon'?'limewater':'splint')&&!e.testedBy?'ready':''}`}>产物 {e.product} · {e.testedBy?'已检验':'如何检验呢？'}</span></summary>{e.testedBy&&<p>{e.kind==='carbon'?'通入澄清石灰水 → 变浑浊':'伸入带火星的木条 → 复燃'} · 接力＋5</p>}<details><summary>查看反应记录</summary><p>{e.kind==='carbon'?'CaCO₃ + 2HCl → CaCl₂ + H₂O + CO₂↑':'2H₂O₂ → 2H₂O + O₂↑（二氧化锰催化）'}</p><p>{e.kind==='carbon'?'完整生成物：氯化钙、水、二氧化碳。':'完整生成物：水、氧气。二氧化锰未消耗。'}本局只开放气体的一次检验接力。分数记录实验成果，不表示物质数量。</p>{e.testedBy&&<p>{e.kind==='carbon'?'CO₂ + Ca(OH)₂ → CaCO₃↓ + H₂O；本次少量气体检验到此结束。':'氧气支持木条燃烧，木条复燃；检验到此结束。'}</p>}</details></details>))}
+      {([0,1] as const).map(side => (game.experiments?.[side] || []).map(e=><details className="cg-experiment" key={e.id} aria-label={`${side===0?'你的':'电脑的'}${e.product}反应记录`}><summary><strong>{side===0?'你':'电脑'}</strong><span className={`cg-product ${e.testedBy?'tested':''} ${side===0&&card?.chemical===chainText[e.kind].tester&&!e.testedBy?'ready':''}`}>产物 {e.product} · {e.testedBy?'已检验':'如何检验呢？'}</span></summary>{e.testedBy&&<p>{chainText[e.kind].testedDetail} · 接力＋5</p>}<details><summary>查看反应记录</summary><p>{chainText[e.kind].equation}</p><p>{chainText[e.kind].productsNote}本局只开放气体的一次检验接力。分数记录实验成果，不表示物质数量。</p>{e.testedBy&&<p>{chainText[e.kind].testedNote}</p>}</details></details>))}
 
       <div className="cg-sr-only" role="status" key={notice}>{notice || '下一局开始，剩余手牌继续使用。'}</div>
       {(game.phase === 'round' || game.phase === 'over') && <section className="cg-result"><h2>{game.result}</h2><p>本局总分：你 {score(game, 0)} · 电脑 {score(game, 1)}</p><p>{game.phase === 'round' ? `你还剩 ${game.players[0].hand.length} 张牌，将全部保留到下一局。` : '换个思路，再来一场。'}</p>{game.phase === 'round' ? <button className="primary" onClick={() => dispatch({ type: 'next' })}>下一局 · 保留手牌</button> : <><button className="primary" onClick={() => startQuick(true)}>再来一局</button><button onClick={() => setBuilding(true)}>调整牌组</button></>}</section>}
@@ -152,7 +157,7 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
       {game.phase==='mulligan'&&<section className="cg-hand cg-spare"><div className="cg-hand-head"><strong>备用牌 · {game.players[0].deck.length}</strong><small>换入从这里挑</small></div><div className="cg-hand-cards">{game.players[0].deck.map(c => tile(c))}</div></section>}
       {game.phase === 'play' && <div className="cg-actions"><div className="cg-preview">{card ? <><strong>{card.name} <button className="cg-info" onClick={()=>setInspect(card)} aria-label="查看卡牌说明">ⓘ</button></strong><span>{targetHint}</span>{preview&&<span>你 {score(game,0)} → {score(preview,0)}{game.duel?` · 对手 ${score(game,1)} → ${score(preview,1)}`:''}</span>}{needsTarget&&target&&<button onClick={()=>{setTarget(undefined);setReplacement(undefined);}}>重选目标</button>}</> : <span>{canPlay ? '先点击一张手牌' : game.players[0].passed ? '已停牌，剩余手牌保留' : '等待电脑行动'}</span>}</div><button className="primary" disabled={!canPlay || !preview} onClick={() => playAction && dispatch(playAction)}>{needsTarget?'执行战术':playLabel}{preview&&!game.duel ? ` +${score(preview, 0) - score(game, 0)}` : ''}</button><button disabled={!canPlay} onClick={() => setConfirmPass(true)}>收手</button></div>}
     </>}
-    {inspect && <div className="cg-overlay" onClick={()=>setInspect(null)}><section className="cg-dialog" role="dialog" aria-modal="true" aria-label="卡牌说明" onClick={e=>e.stopPropagation()}><div className="cg-inspect-art">{tile(inspect, undefined, true)}</div><h2>{inspect.name} · {inspect.symbol}</h2><p>{inspect.fact}</p>{game.phase==='mulligan'&&inspectZone==='hand'&&(game.swapped.includes(inspect.id)?<p className="cg-mulligan-note">刚换进来，不能再换。</p>:<button className="primary" onClick={()=>{setSwapOut(inspect.id);setInspect(null);}}>换掉这张牌</button>)}{game.phase==='mulligan'&&inspectZone==='deck'&&<button className="primary" onClick={()=>{setSwapIn(inspect.id);setInspect(null);}}>换这张进来</button>}<button autoFocus onClick={()=>setInspect(null)}>知道了</button></section></div>}
+    {inspect && <div className="cg-overlay" onClick={()=>setInspect(null)}><section className="cg-dialog" role="dialog" aria-modal="true" aria-label="卡牌说明" onClick={e=>e.stopPropagation()}><div className="cg-inspect-art">{tile(inspect, undefined, true)}</div><h2>{inspect.name} · {inspect.symbol}</h2><p>{inspect.fact}</p>{comboInfo(inspect.chemical).map(line => <p key={line} className="cg-combo-info">⚗ {line}</p>)}{game.phase==='mulligan'&&inspectZone==='hand'&&(game.swapped.includes(inspect.id)?<p className="cg-mulligan-note">刚换进来，不能再换。</p>:<button className="primary" onClick={()=>{setSwapOut(inspect.id);setInspect(null);}}>换掉这张牌</button>)}{game.phase==='mulligan'&&inspectZone==='deck'&&<button className="primary" onClick={()=>{setSwapIn(inspect.id);setInspect(null);}}>换这张进来</button>}<button autoFocus onClick={()=>setInspect(null)}>知道了</button></section></div>}
     {confirmPass && <div className="cg-overlay"><section role="dialog" aria-modal="true" aria-label="确认本局停牌" className="cg-dialog"><h2>把剩下的牌留给下一局？</h2><p>你 {score(game, 0)} 分，对手 {score(game, 1)} 分。</p><p>{score(game, 0) > score(game, 1) && game.players[1].passed ? '对手已停牌，你将赢下本局。' : '确认后，本局不能继续出牌；对手仍可继续出牌追分。'}剩余 {game.players[0].hand.length} 张牌会保留。</p><button autoFocus onClick={() => setConfirmPass(false)}>继续出牌</button><button className="primary" onClick={() => dispatch({ type: 'pass' })}>确认，本局收手</button></section></div>}
     {confirmExit && <div className="cg-overlay"><section role="dialog" aria-modal="true" aria-label="退出对局" className="cg-dialog"><h2>返回游戏首页？</h2><p>当前对局不会保存，你的牌组会保留。</p><button autoFocus onClick={() => setConfirmExit(false)}>继续玩</button><button onClick={home}>返回首页</button></section></div>}
     <footer>完成反应，寻找证据。分数是游戏奖励，不表示物质数量。</footer></div></main>;
