@@ -4,7 +4,7 @@ import type { Action, Card, Game, Side, Experiment } from '../gwent/engine';
 import { createLesson, easyAI, guide, lessonNames } from '../gwent/onboarding';
 import type { Lesson } from '../gwent/onboarding';
 import { TableAudio } from '../gwent/audio';
-import { readDeck } from '../gwent/duel';
+import { opponentById, readDeck } from '../gwent/duel';
 import { gameAsset } from '../gwent/artwork';
 import { INTRO_KEY, createQuickMatch, quickHint } from '../gwent/entry';
 import { GwentDeckBuilder } from './GwentDeckBuilder';
@@ -41,6 +41,13 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
   const [saveError, setSaveError] = useState(false);
   const [difficulty, setDifficulty] = useState<'easy' | 'normal'>(() => { try { return localStorage.getItem('chem-gwent-difficulty') === 'normal' ? 'normal' : 'easy'; } catch { return 'easy'; } });
   function pickDifficulty(level: 'easy' | 'normal') { setDifficulty(level); try { localStorage.setItem('chem-gwent-difficulty', level); } catch { /* The match still works without persistence. */ } }
+  const [opponentTurn, setOpponentTurn] = useState(() => { try { return Number(localStorage.getItem('chem-gwent-opponent-turn-v1')) || 0; } catch { return 0; } });
+  function takeOpponentTurn() {
+    const current = opponentTurn, next = (current + 1) % 3;
+    setOpponentTurn(next);
+    try { localStorage.setItem('chem-gwent-opponent-turn-v1', String(next)); } catch { /* Rotation is optional browser-only preference. */ }
+    return current;
+  }
   const [target, setTarget] = useState<string>();
   const [replacement, setReplacement] = useState<string>();
   const [swapOut, setSwapOut] = useState<string>();
@@ -114,7 +121,7 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
   function dispatch(action: Action) { const next = act(game, action); if (next === game) return; setGame(next); if (intro && next.phase === 'over') rememberIntro(); setNotice(describe(game, next, action)); recordAction(game, next, action); setSelected(null); setTarget(undefined); setReplacement(undefined); setConfirmPass(false); respond(game, next); }
   useEffect(() => {
     if (!started || building || game.phase !== 'play' || game.turn !== 1 || burst || duelEvent) return;
-    const timer = window.setTimeout(() => { const action = game.duel ? chooseAI(game, { level: difficulty }) : easyAI(game, lesson); const next = act(game, action); setGame(next); if (intro && next.phase === 'over') rememberIntro(); setNotice(describe(game, next, action)); recordAction(game, next, action); respond(game, next); }, 1500);
+    const timer = window.setTimeout(() => { const action = game.duel ? chooseAI(game, { level: difficulty, style: game.opponentId }) : easyAI(game, lesson); const next = act(game, action); setGame(next); if (intro && next.phase === 'over') rememberIntro(); setNotice(describe(game, next, action)); recordAction(game, next, action); respond(game, next); }, 1500);
     return () => window.clearTimeout(timer);
   }, [game, started, lesson, burst, duelEvent, building, intro, difficulty]);
   function begin(next: Lesson) { setIntro(false); setRules(false); setBuilding(false); setBurst(null); setDuelEvent(''); setRecentAction(null); setRoundActions([]); setLesson(next); setGame(createLesson(next)); setSelected(null); setTarget(undefined); setReplacement(undefined); setSwapOut(undefined); setSwapIn(undefined); setInspect(null); setNotice('你先手。点击手牌，再点出牌。'); setStarted(true); setConfirmPass(false); soundStart(); }
@@ -125,9 +132,11 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
   function startQuick(forceDuel = false) {
     const experienced = returning || forceDuel;
     if (forceDuel) rememberIntro();
-    setGame(createQuickMatch(deckKeys, experienced)); setIntro(!experienced); setHints(true); setLesson(experienced ? 'practice' : 'bond'); setRules(false); setStarted(true); setBuilding(false); setSelected(null); setTarget(undefined); setReplacement(undefined); setSwapOut(undefined); setSwapIn(undefined); setInspect(null); setBurst(null); setDuelEvent(''); setRecentAction(null); setRoundActions([]); setNotice(experienced ? '牌组已带好，可以直接开战，也可换两张起手牌。' : '你先手，选一张手牌开始对决。'); setConfirmPass(false); setHomeNotice(''); soundStart();
+    const opponentIndex = experienced ? takeOpponentTurn() : 0;
+    setGame(createQuickMatch(deckKeys, experienced, opponentIndex)); setIntro(!experienced); setHints(true); setLesson(experienced ? 'practice' : 'bond'); setRules(false); setStarted(true); setBuilding(false); setSelected(null); setTarget(undefined); setReplacement(undefined); setSwapOut(undefined); setSwapIn(undefined); setInspect(null); setBurst(null); setDuelEvent(''); setRecentAction(null); setRoundActions([]); setNotice(experienced ? '牌组已带好，可以直接开战，也可换两张起手牌。' : '你先手，选一张手牌开始对决。'); setConfirmPass(false); setHomeNotice(''); soundStart();
   }
   const hint = intro && hints ? quickHint(game) : null;
+  const opponent = opponentById(game.opponentId);
   const playAction: Action | null = card ? { type: 'card', id: card.id, target, replacement } : null;
   const proposed = playAction && canPlay ? act(game, playAction) : null;
   const preview = proposed === game ? null : proposed;
@@ -160,7 +169,7 @@ export function ChemGwent({ onBack }: { onBack: () => void }) {
     {settings && <div className="cg-audio"><button aria-pressed={musicOn} onClick={() => { setMusicOn(!musicOn); void audio.current?.start(!musicOn, fxOn, volume).catch(() => setAudioError(true)); }}>♫ 音乐{musicOn ? '开' : '关'}</button><label>音量 <input aria-label="音乐音量" type="range" min="0" max="1" step="0.05" value={volume} onChange={e => setVolume(Number(e.target.value))} /></label><button aria-pressed={fxOn} onClick={() => setFxOn(!fxOn)}>音效{fxOn ? '开' : '关'}</button>{audioError && <button onClick={soundStart}>点击重试播放音乐</button>}</div>}
     {rules && <section className="cg-rules" aria-label="游戏帮助"><h2>怎么玩</h2><p>轮流出牌，高分赢下本局。输一局熄灭一颗宝石，两颗都熄灭则整场结束。<br />“收手”会结束你本局的行动，剩余手牌留到下一局。</p><details><summary>组合与完整规则</summary><p>开局 10 张牌，局间清场、不补牌。上局胜者先手，平局交换先手；平分双方都失去一颗宝石。反应物使用一次后标记已反应；催化剂不消耗。产物只能接力检验一次，检验材料可以提前布置。木条代表检验操作的准备，不表示它会一直保持火星。每种制气组合每侧每局奖励一次。自由对战另有 6 张备用牌供间谍抽取。</p></details>{(!started || game.phase==='over')&&!building&&<details><summary>可选练习</summary><div className="cg-practice-links"><button onClick={()=>begin('first')}>出牌与留牌</button><button onClick={()=>begin('bond')}>二氧化碳接力</button><button onClick={()=>begin('reaction')}>氧气接力</button></div></details>}{intro&&started&&<button onClick={()=>{setHints(true);setRules(false);}}>显示局内提示</button>}</section>}
     {building ? <GwentDeckBuilder initial={deckKeys} onSave={saveDeck} onClose={()=>setBuilding(false)} /> : !started ? <section className="cg-welcome"><span className="cg-kicker">CHEMICAL COMPANIONS</span><h2>让化学伙伴，<br />产生一点反应。</h2><p>巧妙组合，赢下这一局。</p><div className="cg-showcase" aria-label="化学伙伴卡牌预览">{['acid','peroxide','limewater'].map(chemical=>tile(createLesson('bond').players[0].hand.find(c=>c.chemical===chemical)!,undefined,true))}</div><div className="cg-home-actions"><button className="primary cg-start" onClick={()=>startQuick()}>开始对决<span aria-hidden="true">→</span></button><button className="cg-deck-link" onClick={()=>{setBuilding(true);setHomeNotice('');setRules(false);}}>我的牌组</button></div><div className="cg-difficulty" role="group" aria-label="对手强度"><span>对手强度</span><button aria-pressed={difficulty==='easy'} onClick={()=>pickDifficulty('easy')}>轻松 · 它会犯错</button><button aria-pressed={difficulty==='normal'} onClick={()=>pickDifficulty('normal')}>认真 · 全力计算</button></div>{homeNotice&&<p role="status" className="cg-home-notice">{homeNotice}</p>}</section> : <>
-      <section className="cg-coach"><small>{game.duel?`自由对战 · ${difficulty==='easy'?'轻松对手':'全力对手'}`:intro?'入门练习赛':lessonNames[lesson].replace(/^\d · /,'练习 · ')} · 第 {game.round} 局</small>{!intro&&lesson!=='practice'&&<details><summary>提示</summary><p>{guide(game, lesson)}</p></details>}{game.duel&&<details><summary>对战记录</summary>{game.log.slice(-6).map((line,i)=><p key={i}>{line}</p>)}</details>}{intro&&hints&&<button className="cg-dismiss-hint" onClick={()=>{setHints(false);rememberIntro();}}>关闭引导</button>}</section>
+      <section className="cg-coach"><small>{game.duel?`自由对战 · ${difficulty==='easy'?'轻松对手':'认真对手'} · ${opponent?.name ?? '练习伙伴'}（${opponent?.role ?? '基础练习'}）`:intro?'入门练习赛':lessonNames[lesson].replace(/^\d · /,'练习 · ')} · 第 {game.round} 局</small>{game.duel&&opponent&&<span className="cg-opponent-note">{opponent.description}。它只知道自己的手牌和桌面上的公开信息。</span>}{!intro&&lesson!=='practice'&&<details><summary>提示</summary><p>{guide(game, lesson)}</p></details>}{game.duel&&<details><summary>对战记录</summary>{game.log.slice(-6).map((line,i)=><p key={i}>{line}</p>)}</details>}{intro&&hints&&<button className="cg-dismiss-hint" onClick={()=>{setHints(false);rememberIntro();}}>关闭引导</button>}</section>
       {saveError&&<p role="alert">浏览器未允许保存牌组，本局仍可正常游玩。</p>}
       <MatchActionFeed event={recentAction} />
       {duelEvent&&<div className="cg-duel-event" role="status">{duelEvent}</div>}

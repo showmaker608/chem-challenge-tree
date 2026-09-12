@@ -12,8 +12,7 @@ assert.equal(collection.length, 21);
 for (const p of presets) { assert.deepEqual(deckErrors(p.cards), []); assert.notDeepEqual([...opponentFor(p.cards).cards].sort(), [...p.cards].sort()); }
 assert.ok(deckErrors([]).length);
 assert.ok(deckErrors([...presets[0].cards, 'mentor']).length);
-assert.ok(deckErrors(presets[0].cards.map(k => k === 'review' ? 'witness' : k)).length);
-assert.ok(deckErrors(presets[0].cards.map(k => k === 'review' ? 'fake' : k)).length);
+assert.ok(deckErrors(presets[0].cards.map(k => k === 'relay' ? 'fake' : k)).length);
 assert.deepEqual(readDeck('{bad'), presets[0].cards);
 assert.deepEqual(readDeck(JSON.stringify(presets[2].cards)), presets[2].cards);
 let g = createDuel(presets[0].cards, presets[1].cards, () => .3);
@@ -27,7 +26,7 @@ assert.equal(act(swapped, { type: 'swap', id: swapped.players[0].hand[2].id }), 
 // Designated swap: player picks both the outgoing hand card and the incoming spare card.
 g = createDuel(presets[0].cards, presets[1].cards, () => .3);
 const out = g.players[0].hand[0], pick = g.players[0].deck[2];
-let designated = act(g, { type: 'swap', id: out.id, with: pick.id });
+const designated = act(g, { type: 'swap', id: out.id, with: pick.id });
 assert.notEqual(designated, g, 'designated swap legal');
 assert.equal(designated.swaps, 1);
 assert.ok(designated.players[0].hand.some(c => c.id === pick.id), 'chosen spare enters hand');
@@ -96,6 +95,30 @@ for (let n = 0; n < 20; n++) {
   assert.equal(eg.phase, 'over'); assert.ok(eg.round <= 3);
 }
 console.log('PASS: deck validation/persistence recovery, mulligan, spy 0/1/2 draws, both heroes, challenge/review, relay restrictions, round cleanup, 200 full constructed matches, hidden-hand independence, easy-AI behavior and 20 easy matches.');
+
+// Opponent personas: all rotate into a match, make distinct legal decisions, and still cannot see hidden cards.
+assert.deepEqual(presets.map((_, turn) => opponentFor(presets[0].cards, turn).id), ['relay', 'guard', 'relay'], 'identical deck is skipped while remaining opponents rotate');
+assert.deepEqual(presets.map((_, turn) => opponentFor(['iron', 'iron', 'copper', 'copper', 'nitrogen', 'nitrogen', 'silica', 'silica', 'carbonate', 'carbonate', 'acid', 'acid', 'peroxide', 'catalyst', 'limewater', 'splint'], turn).id), ['rush', 'relay', 'guard'], 'a custom deck can meet every persona');
+g = fresh(); g.turn = 1; g.players[1].hand = [card('copper', '-rush'), card('peroxide', '-rush'), card('catalyst', '-rush')];
+assert.equal((chooseAI(g, { style: 'rush' }) as Extract<typeof chosen, { type: 'card' }>).id, 'copper-rush', 'rush player takes immediate score');
+g = fresh(); g.turn = 1; g.players[1].hand = [card('limewater', '-hold'), card('carbonate', '-hold'), card('acid', '-hold')];
+assert.notEqual((chooseAI(g, { style: 'relay' }) as Extract<typeof chosen, { type: 'card' }>).id, 'limewater-hold', 'relay player keeps a tester until gas exists');
+g.players[1].board = [card('carbonate', '-made'), card('acid', '-made')]; g.players[1].hand = [card('limewater', '-finish'), card('copper', '-finish')];
+assert.equal((chooseAI(g, { style: 'relay' }) as Extract<typeof chosen, { type: 'card' }>).id, 'limewater-finish', 'relay player cashes in a prepared inspection');
+g = fresh(); g.turn = 1; g.players[0].board = [card('carbonate', '-target'), card('acid', '-target'), card('limewater', '-target')]; g.experiments = [[{ id: 'guard-target', kind: 'carbon', cards: ['carbonate-target', 'acid-target'], product: 'CO₂', testedBy: 'limewater-target' }], []]; g.players[1].hand = [card('challenge', '-guard'), card('copper', '-guard')];
+assert.equal((chooseAI(g, { style: 'guard' }) as Extract<typeof chosen, { type: 'card' }>).id, 'challenge-guard', 'guard player counters a visible completed chain');
+g = fresh(); g.turn = 1; g.players[0].board = [card('copper', '-lead'), card('copper', '-lead2'), card('copper', '-lead3')]; g.players[1].hand = [card('carbonate', '-save'), card('acid', '-save'), card('limewater', '-save')];
+assert.deepEqual(chooseAI(g, { style: 'relay' }), { type: 'pass' }, 'relay player gives up a lost round to preserve a complete chain');
+for (const persona of presets) for (let n = 0; n < 20; n++) {
+  let pg = act(createDuel(presets[n % 3].cards, persona.cards, random, persona.id), { type: 'start' });
+  let turns = 0;
+  while (pg.phase !== 'over' && turns++ < 150) { const next = act(pg, pg.phase === 'round' ? { type: 'next' } : chooseAI(pg)); assert.notEqual(next, pg, `${persona.name} always makes a legal action`); pg = next; }
+  assert.equal(pg.phase, 'over', `${persona.name} finishes matches`);
+}
+g = act(createDuel(presets[0].cards, presets[1].cards, random, 'guard'), { type: 'start' }); g.turn = 1;
+const guarded = chooseAI(g); g.players[0].hand = g.players[0].hand.map((c, i) => ({ ...card('silica', `-hidden-${i}`), power: 999 }));
+assert.deepEqual(chooseAI(g), guarded, 'persona AI still ignores opponent hidden cards');
+console.log('PASS: rotating rush/relay/guard opponents, distinct score-chain-counter and pass decisions, legal full matches, hidden-hand isolation.');
 
 // Hydrogen chain: metal + acid -> H2, tested by flame (lit splint); either metal qualifies.
 g = fresh(); g = play(g, 'iron'); g = play(g, 'acid');
