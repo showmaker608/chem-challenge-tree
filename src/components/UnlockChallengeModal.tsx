@@ -14,9 +14,17 @@ export function UnlockChallengeModal({
   onClose,
   onPass,
 }: UnlockChallengeModalProps) {
+  // 从每个前置知识点随机抽一题（避免总抽到第1题）
   const challengeSet = useMemo<Challenge[]>(() => {
-    const pool = prerequisiteNodes.flatMap((node) => node.challenges);
-    return pool.slice(0, Math.min(3, pool.length));
+    return prerequisiteNodes
+      .filter((node) => node.challenges.length > 0 || (node.bigQuestion?.subQuestions.length ?? 0) > 0)
+      .map((node) => {
+        const pool = node.challenges.length > 0 ? node.challenges : (node.bigQuestion?.subQuestions ?? []);
+        // 优先从第2题之后选，如果只有1题就选它
+        const start = pool.length > 1 ? 1 : 0;
+        const idx = start + Math.floor(Math.random() * (pool.length - start));
+        return pool[idx];
+      });
   }, [prerequisiteNodes]);
 
   const [challengeIdx, setChallengeIdx] = useState(0);

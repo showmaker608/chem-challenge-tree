@@ -1,18 +1,33 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { ClassAccess, PlayerState } from '../types';
-import { cloudLogin } from '../services/cloudSync';
+import { cloudLogin, cloudRegister } from '../services/cloudSync';
 import { clearFailedLogins, getLoginBlockStatus, recordFailedLogin } from '../services/loginGuard';
 
 interface InviteGateProps {
-  onSignIn: (classAccess: ClassAccess, studentName: string, pin: string, cloudProgress?: PlayerState | null, studentId?: string) => void;
+  courseId: string;
+  onSignIn: (classAccess: ClassAccess, studentId: string, studentName: string, cloudProgress?: PlayerState | null, displayName?: string, avatar?: string, dashboardToken?: string, socialToken?: string) => void;
   onBack: () => void;
+  initialMode?: 'login' | 'register';
 }
 
-export function InviteGate({ onSignIn, onBack }: InviteGateProps) {
-  const [inviteCode, setInviteCode] = useState('');
+function loadSavedCreds(): { classCode: string; studentId: string } {
+  try {
+    const raw = localStorage.getItem('chem-tree-last-creds');
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // Ignore damaged saved credentials and show empty fields.
+  }
+  return { classCode: '', studentId: '' };
+}
+
+export function InviteGate({ courseId, onSignIn, onBack, initialMode = 'login' }: InviteGateProps) {
+  const saved = loadSavedCreds();
+  const [isRegister, setIsRegister] = useState(initialMode === 'register');
+  const [inviteCode, setInviteCode] = useState(saved.classCode);
+  const [studentId, setStudentId] = useState(saved.studentId);
   const [studentName, setStudentName] = useState('');
-  const [pin, setPin] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isChecking, setIsChecking] = useState(false);
   const [blockedSeconds, setBlockedSeconds] = useState(0);
@@ -29,121 +44,95 @@ export function InviteGate({ onSignIn, onBack }: InviteGateProps) {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    const cleanPin = pin.trim();
-
     if (isChecking) return;
-
     const blockStatus = getLoginBlockStatus();
     if (blockStatus.blocked) {
       setBlockedSeconds(blockStatus.remainingSeconds);
-      setError(`登录尝试过多，请 ${blockStatus.remainingSeconds} 秒后再试`);
+      setError(`尝试过多，请 ${blockStatus.remainingSeconds} 秒后再试`);
       return;
     }
-
-    if (!inviteCode.trim() || !studentName.trim()) {
-      setError('请填写激活码和姓名');
-      return;
-    }
-
-    if (!/^\d{4}$/.test(cleanPin)) {
-      setError('PIN 请输入 4 位数字');
-      return;
-    }
-
+    if (!inviteCode.trim()) { setError('请填写邀请码'); return; }
+    if (!studentId.trim()) { setError('请填写学号'); return; }
+    if (!password.trim()) { setError('请设置密码'); return; }
+    if (isRegister && !studentName.trim()) { setError('请填写姓名'); return; }
     setError('');
     setIsChecking(true);
-
-    const result = await cloudLogin(inviteCode, studentName, cleanPin);
+    const result = isRegister
+      ? await cloudRegister(inviteCode, studentId, studentName, password, courseId)
+      : await cloudLogin(inviteCode, studentId, password, courseId);
     setIsChecking(false);
-
     if (!result.ok) {
       const nextBlockStatus = recordFailedLogin();
       if (nextBlockStatus.blocked) {
         setBlockedSeconds(nextBlockStatus.remainingSeconds);
-        setError(`登录尝试过多，请 ${nextBlockStatus.remainingSeconds} 秒后再试`);
+        setError(`尝试过多，请 ${nextBlockStatus.remainingSeconds} 秒后再试`);
       } else {
         setBlockedSeconds(0);
-        setError(`${result.message ?? '登录失败'}。还可尝试 ${nextBlockStatus.attemptsRemaining} 次`);
+        setError(`${result.message ?? '操作失败'}。还可尝试 ${nextBlockStatus.attemptsRemaining} 次`);
       }
       return;
     }
-
     clearFailedLogins();
     setBlockedSeconds(0);
     onSignIn(
       { classCode: inviteCode.trim().toUpperCase(), className: result.profile?.className ?? '' },
-      studentName,
-      cleanPin,
+      studentId.trim(),
+      result.profile?.studentName ?? studentName.trim(),
       result.progress,
-      result.profile?.studentId,
+      result.profile?.displayName || '',
+      result.profile?.avatar || '',
+      result.profile?.dashboardToken || '',
+      result.profile?.socialToken || '',
     );
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8 flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8" style={{ background: `radial-gradient(circle at 20% 0%, var(--teal-glow), transparent 32rem), linear-gradient(180deg, var(--bg-page-start) 0%, var(--bg-page-mid) 100%)` }}>
       <div className="w-full max-w-sm">
-        <button onClick={onBack} className="text-sm text-slate-500 hover:text-slate-300 mb-4">← 返回首页</button>
+        <button onClick={onBack} className="text-sm text-teal-600 hover:text-[var(--text-main)] mb-4">← 返回首页</button>
 
         <div className="mb-6">
-          <div className="text-4xl mb-3">🔑</div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-            激活账号
+          <div className="text-4xl mb-3">{isRegister ? '📝' : '🔑'}</div>
+          <h1 className="text-2xl font-bold text-[var(--text-main)]">
+            {isRegister ? '注册账号' : '登录'}
           </h1>
-          <p className="text-sm text-slate-400 mt-2">
-            输入老师发给你的激活码，存档你的闯关进度
+          <p className="text-sm text-[var(--text-muted)] mt-2">
+            {isRegister ? '首次使用，输入老师给的邀请码并创建账号' : '已有账号，输入信息登录'}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-slate-800/70 border border-slate-700/50 rounded-2xl p-5 space-y-4">
+        <div className="flex mb-4 bg-[var(--bg-disabled)] rounded-xl p-1">
+          <button onClick={() => setIsRegister(true)} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${isRegister ? 'bg-teal-600 text-white' : 'text-[var(--text-muted)]'}`}>注册</button>
+          <button onClick={() => setIsRegister(false)} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${!isRegister ? 'bg-teal-600 text-white' : 'text-[var(--text-muted)]'}`}>登录</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 space-y-4 shadow-sm">
           <label className="block">
-            <span className="text-xs text-slate-400">激活码</span>
-            <input
-              value={inviteCode}
-              onChange={(event) => setInviteCode(event.target.value)}
-              className="mt-1 w-full rounded-xl bg-slate-900 border border-slate-700 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
-              placeholder="老师给你的激活码"
-              autoCapitalize="characters"
-              disabled={isChecking}
-            />
+            <span className="text-xs text-[var(--text-muted)]">邀请码</span>
+            <input value={inviteCode} onChange={e => setInviteCode(e.target.value)} className="mt-1 w-full rounded-xl bg-white border border-[var(--border-color)] px-4 py-3 text-sm text-[var(--text-main)] outline-none focus:border-teal-400 placeholder:text-[var(--text-disabled)]" placeholder="老师给你的邀请码" autoCapitalize="characters" disabled={isChecking} />
           </label>
-
           <label className="block">
-            <span className="text-xs text-slate-400">你的姓名</span>
-            <input
-              value={studentName}
-              onChange={(event) => setStudentName(event.target.value)}
-              className="mt-1 w-full rounded-xl bg-slate-900 border border-slate-700 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
-              placeholder="例如 王小明"
-              disabled={isChecking}
-            />
+            <span className="text-xs text-[var(--text-muted)]">学号</span>
+            <input value={studentId} onChange={e => setStudentId(e.target.value)} className="mt-1 w-full rounded-xl bg-white border border-[var(--border-color)] px-4 py-3 text-sm text-[var(--text-main)] outline-none focus:border-teal-400 placeholder:text-[var(--text-disabled)]" placeholder={isRegister ? '自己设一个学号，如 01、02' : '输入你的学号'} disabled={isChecking} />
           </label>
-
+          {isRegister && (
+            <label className="block">
+              <span className="text-xs text-[var(--text-muted)]">姓名</span>
+              <input value={studentName} onChange={e => setStudentName(e.target.value)} className="mt-1 w-full rounded-xl bg-white border border-[var(--border-color)] px-4 py-3 text-sm text-[var(--text-main)] outline-none focus:border-teal-400 placeholder:text-[var(--text-disabled)]" placeholder="你的真实姓名" disabled={isChecking} />
+            </label>
+          )}
           <label className="block">
-            <span className="text-xs text-slate-400">4 位 PIN（自己设一个，别忘）</span>
-            <input
-              value={pin}
-              onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
-              className="mt-1 w-full rounded-xl bg-slate-900 border border-slate-700 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400"
-              placeholder="例如 4827"
-              inputMode="numeric"
-              type="password"
-              disabled={isChecking}
-            />
+            <span className="text-xs text-[var(--text-muted)]">{isRegister ? '设置密码' : '密码'}</span>
+            <input value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded-xl bg-white border border-[var(--border-color)] px-4 py-3 text-sm text-[var(--text-main)] outline-none focus:border-teal-400 placeholder:text-[var(--text-disabled)]" placeholder={isRegister ? '自己设一个密码，别太简单' : '输入你的密码'} type="password" disabled={isChecking} />
           </label>
-
-          {error && <p className="text-xs text-red-300">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={isChecking || blockedSeconds > 0}
-            className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-600 disabled:text-slate-300 text-white rounded-xl font-medium transition-colors"
-          >
-            {isChecking ? '验证中...' : blockedSeconds > 0 ? '暂时停止登录' : '登录'}
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <button type="submit" disabled={isChecking || blockedSeconds > 0} className="w-full py-3 bg-teal-600 hover:bg-teal-500 disabled:bg-[var(--bg-disabled)] disabled:text-[var(--text-disabled)] text-white rounded-xl font-medium transition-colors">
+            {isChecking ? '验证中...' : blockedSeconds > 0 ? '暂时无法操作' : isRegister ? '注册' : '登录'}
           </button>
         </form>
 
-        <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-          首次登录将自动创建账号。使用老师发给你的激活码。忘记 PIN 请联系老师重置。
+        <p className="text-xs text-[var(--text-muted)] mt-4 leading-relaxed">
+          {isRegister ? '注册后学号和密码请记好，下次登录要用。每个邀请码有名额限制。' : '忘记密码？联系老师重置。'}
         </p>
       </div>
     </div>

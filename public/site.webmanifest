@@ -1,0 +1,18 @@
+{
+  "name": "化学知识挑战树",
+  "short_name": "化学树",
+  "description": "初中化学闯关练习和错题复习工具",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

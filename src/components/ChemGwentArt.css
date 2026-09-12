@@ -1,0 +1,34 @@
+/* Raster enamel/brass art is shared by board, hand and the enlarged card view. */
+.cg .cg-table{background:#21473b center/100% 100% no-repeat;border:0;outline:0;padding:32px 16px 64px;box-shadow:0 18px 50px #071e1a99}
+.cg .cg-bench,.cg .side-1 .cg-bench{background:none;min-height:174px;padding:12px}.cg .cg-player{background:#12392da8}.cg .cg-divider{background:#163e32cc}.cg .cg-units{min-height:150px}
+.cg .cg-card{--card-width:132px;position:relative;width:var(--card-width);flex:0 0 var(--card-width);height:calc(var(--card-width)*1.5);padding:0;border:0;border-radius:10px;background:none;box-shadow:0 7px 12px #071e1bb3;isolation:isolate;overflow:visible}
+.cg .cg-card:hover:not(:disabled){background:none}
+.cg .cg-card .cg-frame{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+.cg .cg-card .cg-art{position:absolute;inset:4% 5% 23%;width:90%;height:73%;aspect-ratio:auto;z-index:1;border:0;border-radius:9px;background-color:#dfdfcc}
+.cg .cg-card .cg-symbol{position:absolute;top:86%;left:8%;width:84%;font:700 16px/1.2 Georgia;color:#173e36;margin:0;z-index:3;text-align:center}
+.cg .cg-card strong{position:absolute;top:79%;left:7%;width:86%;z-index:3;font:800 12px/1.1 'Songti SC',serif;color:#173e36;text-align:center;letter-spacing:0;white-space:nowrap}
+.cg .cg-card .cg-power{z-index:4;left:-6%;top:-3%;width:34%;height:auto;aspect-ratio:1;background:center/contain no-repeat;border:0;box-shadow:none;text-shadow:0 2px 3px #082c20;font:800 24px/1 Georgia;color:#fff8d5;display:grid;place-items:center;border-radius:0}
+.cg .cg-card small{position:absolute;z-index:3;bottom:25%;left:8%;right:8%;padding:3px 1px;background:#163f36db;border-radius:4px;color:#f4e8bc;font-size:9px;line-height:1.2;text-align:center}
+.cg .cg-card small:empty{display:none}.cg .cg-card .cg-equation{z-index:4;top:5%;right:7%;border-radius:5px}
+.cg .cg-card.selected{outline:2px solid #ffe3a1;outline-offset:3px;box-shadow:0 0 24px #f0cf7677,0 12px 22px #0006}
+.cg .cg-card.cg-used{border:0}.cg .cg-hand .cg-card{--card-width:142px}
+.cg .cg-player{min-height:70px;padding:15px 200px 12px 24px}.cg .cg-player strong{font-family:'Songti SC',serif;font-size:17px;letter-spacing:2px}.cg .cg-player small{margin-top:4px;font-size:11px}
+.cg-lives{position:absolute;right:90px;top:7px;display:flex;gap:4px;align-items:center;height:55px}
+.cg-life{width:52px;height:52px;object-fit:contain;transition:filter .7s,opacity .7s;filter:drop-shadow(0 0 6px #8cdea440)}
+.cg-life.lost{filter:grayscale(1) brightness(.48);opacity:.6;animation:cg-life-extinguish .8s ease-out}
+.cg .cg-total{right:26px;top:10px;font-size:44px}
+.cg-inspect-art{display:flex;justify-content:center;margin:5px 0 22px}.cg .cg-inspect-art .cg-card{--card-width:230px;pointer-events:none}.cg .cg-inspect-art .cg-card strong{font-size:20px}.cg .cg-inspect-art .cg-symbol{font-size:26px}.cg .cg-inspect-art .cg-power{font-size:38px}
+.cg .cg-dialog:has(.cg-inspect-art){max-height:90vh;overflow-y:auto}.cg .cg-dialog:has(.cg-inspect-art) h2{font-size:17px}
+@keyframes cg-life-extinguish{0%{filter:brightness(1.8);opacity:1;transform:scale(1.1)}35%{filter:brightness(2);opacity:1}100%{filter:grayscale(1) brightness(.48);opacity:.6;transform:scale(1)}}
+@media(max-width:600px){.cg .cg-card{--card-width:98px}.cg .cg-hand .cg-card{--card-width:108px}.cg .cg-card strong{font-size:9px}.cg .cg-card .cg-symbol{font-size:13px}.cg .cg-card .cg-power{font-size:19px}.cg .cg-card small{font-size:8px;padding:2px 0}.cg .cg-player{min-height:60px;padding:12px 165px 10px 12px}.cg .cg-player strong{font-size:13px;letter-spacing:0}.cg .cg-player small{font-size:10px}.cg-lives{right:60px;top:6px;gap:0;height:45px}.cg-life{width:43px;height:43px}.cg .cg-total{right:12px;top:10px;font-size:35px}.cg .cg-units{gap:10px}.cg .cg-inspect-art .cg-card{--card-width:190px}.cg .cg-inspect-art .cg-card strong{font-size:17px}.cg .cg-inspect-art .cg-symbol{font-size:23px}.cg .cg-inspect-art .cg-power{font-size:32px}}
+@media(prefers-reduced-motion:reduce){.cg-life.lost{animation:none}.cg-life{transition:none}}
+.cg-showcase{display:flex;justify-content:center;gap:20px;padding:28px 0 15px}.cg .cg-showcase .cg-card{--card-width:clamp(88px,calc((100vw - 180px)/3),200px)}.cg .cg-showcase .cg-card strong{font-size:calc(var(--card-width)*.085)}.cg .cg-showcase .cg-symbol{font-size:calc(var(--card-width)*.115)}.cg .cg-showcase .cg-power{font-size:32px}.cg-showcase .cg-card:nth-child(1){transform:rotate(-5deg)}.cg-showcase .cg-card:nth-child(3){transform:rotate(5deg)}
+@media(max-width:600px){.cg-showcase{gap:6px;padding:20px 0}.cg .cg-showcase .cg-card{--card-width:88px}.cg .cg-showcase .cg-card strong{font-size:8px}.cg .cg-showcase .cg-symbol{font-size:12px}.cg .cg-showcase .cg-power{font-size:18px}}
+.cg-home-actions{display:flex;align-items:center;flex-direction:column;gap:8px;margin:24px auto 0;max-width:340px}
+.cg .cg-home-actions .cg-start{display:flex;align-items:center;justify-content:center;gap:30px;width:100%;min-height:62px;font:800 23px/1.2 'Songti SC',serif;letter-spacing:3px;border-radius:12px}
+.cg .cg-home-actions .cg-deck-link{font-size:14px;min-height:44px;padding:8px 26px;background:transparent;border-color:transparent;box-shadow:none;color:#eddfbd}
+.cg .cg-home-notice{font-size:12px;color:#ebdaa1}.cg .cg-header nav button{width:40px;min-height:40px;padding:6px}
+.cg .cg-dismiss-hint{padding:4px 10px;font-size:11px;min-height:32px;background:none;border-color:#819780;box-shadow:none;color:#cfdbc5}
+.cg-quick-hint{padding:10px 14px;margin-top:12px;border-left:2px solid #cbb575;background:#254b3e;color:#e7dfbd;font-size:12px;line-height:1.6;border-radius:0 8px 8px 0}
+.cg-practice-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.cg-rules details{margin-top:12px}
+@media(max-width:600px){.cg-home-actions{max-width:260px;margin-top:18px}.cg .cg-home-actions .cg-start{font-size:21px;min-height:58px}.cg .cg-home-actions .cg-deck-link{font-size:14px}.cg-quick-hint{font-size:11px}.cg .cg-header nav button{width:36px;min-height:36px}}

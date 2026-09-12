@@ -11,13 +11,49 @@
       "name": "studentLogin",
       "runtime": "Nodejs18.15",
       "timeout": 10,
-      "installDependency": false
+      "installDependency": true
     },
     {
       "name": "syncProgress",
       "runtime": "Nodejs18.15",
       "timeout": 10,
       "installDependency": false
+    },
+    {
+      "name": "manageCodes",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "installDependency": false
+    },
+    {
+      "name": "forum",
+      "runtime": "Nodejs18.15",
+      "timeout": 10,
+      "installDependency": false
+    },
+    {
+      "name": "leaderboard",
+      "runtime": "Nodejs18.15",
+      "timeout": 30,
+      "installDependency": false
+    },
+    {
+      "name": "teacherDashboard",
+      "runtime": "Nodejs18.15",
+      "timeout": 30,
+      "installDependency": false
+    },
+    {
+      "name": "errorLog",
+      "runtime": "Nodejs18.15",
+      "timeout": 5,
+      "installDependency": false
+    },
+    {
+      "name": "analytics",
+      "runtime": "Nodejs18.15",
+      "timeout": 5,
+      "installDependency": true
     }
   ]
 }

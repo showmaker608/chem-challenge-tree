@@ -1,0 +1,12 @@
+node_modules/
+.git/
+.project/
+.github/
+dist/
+public/
+src/
+**/node_modules/
+bun.lock
+package-lock.json
+*.zip
+*.local
