@@ -1,5 +1,5 @@
 import { createGame, freshTactics } from './engine';
-import type { Card, Game } from './engine';
+import type { AIStyle, Card, Game } from './engine';
 import { pool } from './onboarding';
 
 export const DECK_SIZE = 16;
@@ -17,11 +17,13 @@ export const collection: Card[] = [
   { id: 'spy', key: 'spy', name: '访问学者', symbol: '间谍', power: 4, row: 0, ability: 'spy', fact: '进入对方实验台，给对方 4 分；自己从备用牌库抽 2 张。不足两张时有多少抽多少。不查看或偷取对方手牌。' },
 ];
 export const cardByKey = new Map(collection.map(c => [c.key!, c]));
-export const presets = [
-  { name: '反应接力', description: '两条实验链 · 导师奖励', cards: [...keys, 'carbonate', 'acid', 'mentor', 'spy', 'challenge', 'review'] },
-  { name: '守证反击', description: '见证守护 · 质疑与复核', cards: [...keys, 'copper', 'witness', 'spy', 'challenge', 'review', 'measure'] },
-  { name: '灵活调度', description: '物质轮换 · 留牌博弈', cards: [...keys, 'peroxide', 'catalyst', 'spy', 'mentor', 'relay', 'measure'] },
+export interface Opponent { id: AIStyle; name: string; role: string; description: string; cards: string[] }
+export const presets: Opponent[] = [
+  { id: 'rush', name: '抢分先锋', role: '快速抢分', description: '高分物质先压场 · 见好就收', cards: ['copper', 'silica', 'nitrogen', 'carbonate', 'acid', 'limewater', 'peroxide', 'catalyst', 'splint', 'iron', 'copper', 'silica', 'nitrogen', 'spy', 'measure', 'relay'] },
+  { id: 'relay', name: '接力策展人', role: '留牌后发接力', description: '先制气后检验 · 留完整链等时机', cards: [...keys, 'carbonate', 'acid', 'mentor', 'spy', 'challenge', 'review'] },
+  { id: 'guard', name: '证据守卫', role: '干扰保护反击', description: '见证守护 · 质疑与复核', cards: [...keys, 'copper', 'witness', 'spy', 'challenge', 'review', 'measure'] },
 ];
+export const opponentById = (id?: AIStyle) => presets.find(p => p.id === id);
 export function deckErrors(keys: string[]): string[] {
   const cards = keys.map(k => cardByKey.get(k));
   const errors: string[] = [];
@@ -37,9 +39,9 @@ export function readDeck(raw: string | null): string[] {
   try { const saved: unknown = JSON.parse(raw || 'null'); if (Array.isArray(saved) && saved.every(k => typeof k === 'string') && !deckErrors(saved).length) return saved; } catch { /* Recover only this game's deck preference. */ }
   return [...presets[0].cards];
 }
-export function createDuel(keys: string[], opponent: string[], random = Math.random): Game {
+export function createDuel(keys: string[], opponent: string[], random = Math.random, opponentId?: AIStyle): Game {
   if (deckErrors(keys).length || deckErrors(opponent).length) throw new Error('Invalid constructed deck');
-  const g = createGame(random); g.duel = true; g.tactics = freshTactics(); g.experiments = [[], []];
+  const g = createGame(random); g.duel = true; g.opponentId = opponentId; g.tactics = freshTactics(); g.experiments = [[], []];
   g.players.forEach((p, side) => {
     const cards = (side === 0 ? keys : opponent).map((key, i) => ({ ...cardByKey.get(key)!, id: `duel-${side}-${i}` }));
     for (let i = cards.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [cards[i], cards[j]] = [cards[j], cards[i]]; }
@@ -47,7 +49,9 @@ export function createDuel(keys: string[], opponent: string[], random = Math.ran
   });
   g.phase = 'mulligan'; g.log = ['构筑对决：10 张起手，6 张备用；最多换 2 张，局间不自动补牌。']; return g;
 }
-export function opponentFor(keys: string[]): typeof presets[number] {
+// Rotate among all non-identical builds. A custom deck therefore never locks players to one opponent.
+export function opponentFor(keys: string[], turn = 0): Opponent {
   const signature = [...keys].sort().join(',');
-  return presets.find(p => [...p.cards].sort().join(',') !== signature)!;
+  const candidates = presets.filter(p => [...p.cards].sort().join(',') !== signature);
+  return candidates[turn % candidates.length];
 }

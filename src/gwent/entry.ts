@@ -3,8 +3,9 @@ import { createLesson } from './onboarding';
 import { createDuel, opponentFor } from './duel';
 
 export const INTRO_KEY = 'chem-gwent-intro-v1';
-export function createQuickMatch(keys: string[], returning: boolean): Game {
-  return returning ? createDuel(keys, opponentFor(keys).cards) : createLesson('bond');
+export function createQuickMatch(keys: string[], returning: boolean, opponentTurn = 0): Game {
+  const opponent = opponentFor(keys, opponentTurn);
+  return returning ? createDuel(keys, opponent.cards, Math.random, opponent.id) : createLesson('bond');
 }
 
 // One contextual hint at a time; never prevents a legal move.

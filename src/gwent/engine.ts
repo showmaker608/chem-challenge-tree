@@ -25,7 +25,8 @@ export function comboInfo(chemical?: string): string[] {
 }
 export interface Player { hand: Card[]; deck: Card[]; board: Card[]; discard: Card[]; horns: Row[]; lives: number; passed: boolean; leader: boolean }
 export interface Tactics { boosts: Record<string, number>; disputed: string[]; mentorUsed: Side[]; witnessUsed: Side[] }
-export interface Game { players: [Player, Player]; weather: Row[]; turn: Side; starter: Side; round: number; phase: 'mulligan' | 'play' | 'round' | 'over'; swaps: number; swapped: string[]; log: string[]; result: string; experiments?: [Experiment[], Experiment[]]; duel?: boolean; tactics?: Tactics }
+export type AIStyle = 'rush' | 'relay' | 'guard';
+export interface Game { players: [Player, Player]; weather: Row[]; turn: Side; starter: Side; round: number; phase: 'mulligan' | 'play' | 'round' | 'over'; swaps: number; swapped: string[]; log: string[]; result: string; experiments?: [Experiment[], Experiment[]]; duel?: boolean; tactics?: Tactics; opponentId?: AIStyle }
 export const freshTactics = (): Tactics => ({ boosts: {}, disputed: [], mentorUsed: [], witnessUsed: [] });
 export function cardState(g: Game, side: Side, c: Card): string {
   if (g.tactics?.disputed.includes(c.id)) return '奖励待复核';
@@ -196,16 +197,53 @@ export function act(state: Game, action: Action): Game {
   return g;
 }
 // Evaluates only the AI hand and public board, never the player's hidden cards.
-export function chooseAI(g: Game, opts: { level?: 'easy' | 'normal'; random?: () => number } = {}): Action {
+function chainProgress(before: Game, after: Game, side: Side) {
+  const was = before.experiments?.[side] || [], now = after.experiments?.[side] || [];
+  return {
+    created: now.filter(e => !was.some(old => old.id === e.id)).length,
+    tested: now.filter(e => e.testedBy && !was.some(old => old.id === e.id && old.testedBy)).length,
+  };
+}
+function isTester(c: Card) { return c.chemical === 'limewater' || c.chemical === 'splint' || c.chemical === 'flame'; }
+function canFinishOwnChain(g: Game, side: Side) {
+  const chemicals = new Set<string | undefined>([...g.players[side].hand, ...g.players[side].board].map(c => c.chemical));
+  return chains.some(chain => chain.materials.every(material => chemicals.has(material)) && chemicals.has(chain.tester));
+}
+// Evaluates only the AI hand and public board, never the player's hidden cards.
+// Each style changes priorities and when it gives up a round; no style receives hidden information.
+export function chooseAI(g: Game, opts: { level?: 'easy' | 'normal'; random?: () => number; style?: AIStyle } = {}): Action {
   const level = opts.level ?? 'normal', random = opts.random ?? Math.random;
+  const style = opts.style ?? g.opponentId ?? 'rush';
   const s = g.turn, other: Side = s === 0 ? 1 : 0, p = g.players[s], enemy = g.players[other];
   const margin = score(g, s) - score(g, other);
   if (enemy.passed && margin > 0) return { type: 'pass' };
   const actions: Action[] = p.hand.flatMap(c => cardActions(g, s, c));
   if (p.leader && g.weather.length) actions.push({ type: 'leader' });
-  const rated = actions.map(action => { const next = act(g, action); const gain = score(next, s) - score(next, other) - margin; const draw = next.players[s].hand.length - p.hand.length + (action.type === 'card' ? 1 : 0); return { action, gain, value: gain + (enemy.passed ? 2 : 7) * draw }; }).sort((a, b) => b.value - a.value);
+  const rated = actions.map(action => {
+    const next = act(g, action), gain = score(next, s) - score(next, other) - margin;
+    const draw = next.players[s].hand.length - p.hand.length + (action.type === 'card' ? 1 : 0);
+    const played = action.type === 'card' ? p.hand.find(c => c.id === action.id) : undefined;
+    const progress = chainProgress(g, next, s);
+    let value = gain + (enemy.passed ? 2 : 7) * draw;
+    if (style === 'rush') value += gain * 1.4 + (played?.ability === 'spy' ? 3 : 0);
+    if (style === 'relay') {
+      value += progress.created * 12 + progress.tested * 24;
+      // A tester is deliberately held until there is gas to inspect.
+      if (played && isTester(played) && !progress.tested) value -= 13;
+      if (played?.skill === 'relay') value += 5;
+    }
+    if (style === 'guard') {
+      if (played?.skill === 'challenge') value += 22;
+      if (played?.skill === 'review') value += 18;
+      if (played?.skill === 'witness' && !g.tactics?.witnessUsed.includes(s)) value += canFinishOwnChain(g, s) ? 12 : 4;
+      value += progress.tested * 9;
+    }
+    return { action, gain, value };
+  }).sort((a, b) => b.value - a.value);
   if (!rated.length) return { type: 'pass' };
   if (enemy.passed) { const enough = rated.filter(x => margin + x.gain > 0).sort((a, b) => a.gain - b.gain); if (enough.length) return enough[0].action; }
+  // The relay player consciously drops a costly round to keep a complete chain for later.
+  if (style === 'relay' && !enemy.passed && p.lives > 1 && margin <= -10 && canFinishOwnChain(g, s)) return { type: 'pass' };
   if (level === 'normal' && !enemy.passed && p.lives > 1 && ((margin < -16 && p.hand.length <= enemy.hand.length + 1) || (margin > 12 && p.hand.length < enemy.hand.length))) return { type: 'pass' };
   if (rated[0].value <= 0 && margin >= 0) return { type: 'pass' };
   if (level === 'easy') { const sloppy = rated.filter(x => x.value > 0).slice(0, 3); if (sloppy.length) return sloppy[Math.floor(random() * sloppy.length)].action; }
