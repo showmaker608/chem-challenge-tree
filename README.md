@@ -1,73 +1,35 @@
-# React + TypeScript + Vite
+# 🌳 化学知识挑战树
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**像打游戏一样学化学** —— 面向初中生的游戏化刷题网站。
 
-Currently, two official plugins are available:
+闯关解锁知识点、升级段位、和同学 PK 排行榜。覆盖沪教版八年级化学。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🎮 特点
 
-## React Compiler
+- **技能树闯关**：9 大章节、70+ 知识点，顺序解锁
+- **综合大题**：真实考试场景，4-5 道子题连载
+- **跳章测试**：答对 70% 一键跳过整章
+- **排行榜**：全服 XP 排行，前三名领奖台，只显示昵称
+- **错题本**：自动收录错题，原地重做
+- **学习报告**：各章进度、薄弱知识点一目了然
+- **答对彩带 + 叮咚音效**：正向反馈拉满
+- **论坛**：同学之间讨论化学问题
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🔑 学生怎么用
 
-## Expanding the ESLint configuration
+1. 老师给你一个邀请码
+2. 打开网站，点「输入邀请码」→ 注册 → 填邀请码 + 学号 + 姓名 + 密码
+3. 开始闯关！进度自动保存到云端
+4. 下次用同样的邀请码 + 学号 + 密码登录
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 📱 支持设备
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+手机、平板、电脑都能用。
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🧪 题目来源
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+沪教版初中化学，从历年期中/一模试卷和名校试题汇编中提取改编。
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+网站：[https://xdkchem-d1g3f4ibw03b1b776-1372708082.tcloudbaseapp.com](https://xdkchem-d1g3f4ibw03b1b776-1372708082.tcloudbaseapp.com)

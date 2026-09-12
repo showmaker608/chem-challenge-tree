@@ -1,6 +1,6 @@
 import type { Challenge, StudentProfile } from '../types';
 
-const FEEDBACK_KEY = 'chem-tree-question-feedback';
+const BASE = import.meta.env.VITE_CLOUD_FUNCTION_BASE;
 
 export interface QuestionFeedback {
   id: string;
@@ -17,23 +17,6 @@ export interface QuestionFeedback {
   createdAt: string;
 }
 
-function readFeedback() {
-  try {
-    const raw = localStorage.getItem(FEEDBACK_KEY);
-    return raw ? (JSON.parse(raw) as QuestionFeedback[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeFeedback(items: QuestionFeedback[]) {
-  try {
-    localStorage.setItem(FEEDBACK_KEY, JSON.stringify(items));
-  } catch {
-    // Local feedback is best-effort until CloudBase submission is connected.
-  }
-}
-
 interface SaveQuestionFeedbackInput {
   profile: StudentProfile;
   nodeId: string;
@@ -44,7 +27,8 @@ interface SaveQuestionFeedbackInput {
   comment: string;
 }
 
-export function saveQuestionFeedback(input: SaveQuestionFeedbackInput) {
+export async function saveQuestionFeedback(input: SaveQuestionFeedbackInput) {
+  // 同时存本地和云端
   const feedback: QuestionFeedback = {
     id: `${Date.now()}-${input.nodeId}-${input.challengeIndex}`,
     classCode: input.profile.classCode,
@@ -60,6 +44,33 @@ export function saveQuestionFeedback(input: SaveQuestionFeedbackInput) {
     createdAt: new Date().toISOString(),
   };
 
-  writeFeedback([feedback, ...readFeedback()]);
+  // 本地
+  try {
+    const raw = localStorage.getItem('chem-tree-question-feedback');
+    const items = raw ? (JSON.parse(raw) as QuestionFeedback[]) : [];
+    localStorage.setItem('chem-tree-question-feedback', JSON.stringify([feedback, ...items]));
+  } catch { /* local fallback */ }
+
+  // 云端
+  if (BASE && input.profile.profileId !== 'guest') {
+    try {
+      await fetch(`${BASE}/manageCodes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'submitFeedback',
+          classCode: input.profile.classCode,
+          studentName: input.profile.studentName,
+          nodeId: input.nodeId,
+          nodeTopic: input.nodeTopic,
+          stem: input.challenge.stem,
+          userAnswer: input.selectedAnswer !== null ? input.challenge.options[input.selectedAnswer] : '',
+          correctAnswer: input.challenge.options[input.challenge.answer],
+          comment: input.comment.trim(),
+        }),
+      });
+    } catch { /* cloud fallback */ }
+  }
+
   return feedback;
 }
