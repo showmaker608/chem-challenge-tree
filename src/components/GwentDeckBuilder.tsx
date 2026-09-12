@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { collection, deckErrors, DECK_SIZE, presets } from '../gwent/duel';
-import { comboInfo } from '../gwent/engine';
 import type { Card } from '../gwent/engine';
 import { GwentCardFace } from './GwentCardFace';
 import { GwentCardDetails } from './GwentCardDetails';
